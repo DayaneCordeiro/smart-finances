@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../controllers/user_providers.dart';
-import 'user_list_page.dart';
 
 class CreateUserPage extends ConsumerStatefulWidget {
   const CreateUserPage({super.key});
@@ -45,7 +45,7 @@ class _CreateUserPageState extends ConsumerState<CreateUserPage> {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const UserListPage()),
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
       );
     } catch (e) {
       if (!mounted) return;
@@ -122,7 +122,11 @@ class _CreateUserPageState extends ConsumerState<CreateUserPage> {
                         ElevatedButton(
                           onPressed: _isSaving ? null : _save,
                           child: _isSaving
-                              ? const CircularProgressIndicator()
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
                               : const Text('Criar usuário'),
                         ),
                       ],

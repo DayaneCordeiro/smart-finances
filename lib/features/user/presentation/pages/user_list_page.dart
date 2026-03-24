@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../controllers/user_providers.dart';
 import '../widgets/user_card.dart';
 import 'create_user_page.dart';
@@ -68,9 +69,17 @@ class UserListPage extends ConsumerWidget {
                           ref.invalidate(usersProvider);
                           ref.invalidate(activeUserProvider);
 
+                          if (!context.mounted) return;
+
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('${user.name} agora é o perfil ativo'),
+                            ),
+                          );
+
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const DashboardPage(),
                             ),
                           );
                         },
