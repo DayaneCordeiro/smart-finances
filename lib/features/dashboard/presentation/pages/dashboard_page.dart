@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../../../user/presentation/pages/user_list_page.dart';
+import '../widgets/month_mood_card.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -58,6 +59,8 @@ class DashboardPage extends ConsumerWidget {
                         ),
                         const SizedBox(height: 24),
                         const _MonthHighlightCard(),
+                        const SizedBox(height: 20),
+                        const MonthMoodCard(balance: 250),
                         const SizedBox(height: 20),
                         const _SummaryCardsSection(),
                         const SizedBox(height: 20),
