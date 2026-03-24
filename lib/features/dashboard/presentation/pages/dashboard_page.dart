@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../../../user/presentation/pages/user_list_page.dart';
 import '../widgets/month_mood_card.dart';
+import '../../../category/presentation/pages/category_page.dart';
+import '../../../transaction/presentation/pages/transaction_page.dart';
+import '../../../user/presentation/pages/user_list_page.dart';
+import '../widgets/month_mood_card.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -126,9 +130,23 @@ class _DashboardSidebar extends StatelessWidget {
             title: 'Dashboard',
             selected: true,
           ),
-          const _SidebarItem(
+          _SidebarItem(
             icon: Icons.swap_horiz_outlined,
             title: 'Transações',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TransactionPage()),
+              );
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.category_outlined,
+            title: 'Categorias',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CategoryPage()),
+              );
+            },
           ),
           const _SidebarItem(
             icon: Icons.receipt_long_outlined,
@@ -175,11 +193,13 @@ class _SidebarItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final bool selected;
+  final VoidCallback? onTap;
 
   const _SidebarItem({
     required this.icon,
     required this.title,
     this.selected = false,
+    this.onTap,
   });
 
   @override
@@ -193,7 +213,7 @@ class _SidebarItem extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          onTap: () {},
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -542,24 +562,37 @@ class _QuickActionsSection extends StatelessWidget {
               runSpacing: 12,
               children: [
                 FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TransactionPage(),
+                      ),
+                    );
+                  },
                   icon: const Icon(Icons.add_card_outlined),
                   label: const Text('Nova receita'),
                 ),
                 FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TransactionPage(),
+                      ),
+                    );
+                  },
                   icon: const Icon(Icons.remove_circle_outline),
                   label: const Text('Nova despesa'),
                 ),
                 FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  label: const Text('Nova dívida'),
-                ),
-                FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.directions_car_outlined),
-                  label: const Text('Financiamento'),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const CategoryPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.category_outlined),
+                  label: const Text('Categorias'),
                 ),
               ],
             ),
