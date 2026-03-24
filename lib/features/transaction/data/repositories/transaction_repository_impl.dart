@@ -27,13 +27,15 @@ class TransactionRepositoryImpl implements TransactionRepository {
   }
 
   @override
-  Future<void> togglePaidStatus({
+  Future<void> updateStatus({
     required String transactionId,
-    required bool isPaid,
+    required String status,
+    required DateTime? paidAt,
   }) async {
-    await localDatasource.togglePaidStatus(
+    await localDatasource.updateStatus(
       transactionId: transactionId,
-      isPaid: isPaid,
+      status: status,
+      paidAt: paidAt,
     );
   }
 }

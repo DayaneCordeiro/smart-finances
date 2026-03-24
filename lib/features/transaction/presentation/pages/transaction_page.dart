@@ -18,9 +18,12 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
 
   String _selectedType = 'expense';
   String? _selectedCategoryId;
-  bool _isPaid = false;
+  String _selectedStatus = 'pending';
+  bool _markAsPaid = false;
   bool _isSaving = false;
-  DateTime _selectedDate = DateTime.now();
+
+  DateTime _mainDate = DateTime.now();
+  DateTime? _paidAtDate;
 
   @override
   void dispose() {
@@ -29,17 +32,44 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickMainDate() async {
     final selected = await showDatePicker(
       context: context,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      initialDate: _selectedDate,
+      initialDate: _mainDate,
     );
 
     if (selected != null) {
-      setState(() => _selectedDate = selected);
+      setState(() => _mainDate = selected);
     }
+  }
+
+  Future<void> _pickPaidAtDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      initialDate: _paidAtDate ?? DateTime.now(),
+    );
+
+    if (selected != null) {
+      setState(() => _paidAtDate = selected);
+    }
+  }
+
+  void _syncStatusWithSwitch(bool value) {
+    setState(() {
+      _markAsPaid = value;
+
+      if (value) {
+        _selectedStatus = _selectedType == 'income' ? 'received' : 'paid';
+        _paidAtDate ??= DateTime.now();
+      } else {
+        _selectedStatus = 'pending';
+        _paidAtDate = null;
+      }
+    });
   }
 
   Future<void> _saveTransaction(String userId) async {
@@ -70,21 +100,26 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
             type: _selectedType,
             description: _descriptionController.text,
             amount: amount,
-            transactionDate: _selectedDate,
-            isPaid: _isPaid,
+            dueDate: _selectedType == 'expense' ? _mainDate : null,
+            receivedDate: _selectedType == 'income' ? _mainDate : null,
+            status: _selectedStatus,
+            paidAt: _paidAtDate,
           );
 
       _descriptionController.clear();
       _amountController.clear();
-      _selectedCategoryId = null;
-      _isPaid = false;
-      _selectedDate = DateTime.now();
+
+      setState(() {
+        _selectedCategoryId = null;
+        _selectedStatus = 'pending';
+        _markAsPaid = false;
+        _mainDate = DateTime.now();
+        _paidAtDate = null;
+      });
 
       ref.invalidate(transactionsProvider(userId));
 
       if (!mounted) return;
-
-      setState(() {});
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Transação salva com sucesso')),
@@ -100,6 +135,123 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<void> _changeStatusDialog({
+    required String transactionId,
+    required String currentStatus,
+    required DateTime? currentPaidAt,
+    required String type,
+    required String userId,
+  }) async {
+    String tempStatus = currentStatus;
+    DateTime? tempPaidAt = currentPaidAt;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              title: const Text('Alterar status'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: tempStatus,
+                    decoration: const InputDecoration(
+                      labelText: 'Status',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'pending',
+                        child: Text('Pendente'),
+                      ),
+                      if (type == 'expense')
+                        const DropdownMenuItem(
+                          value: 'paid',
+                          child: Text('Pago'),
+                        ),
+                      if (type == 'income')
+                        const DropdownMenuItem(
+                          value: 'received',
+                          child: Text('Recebido'),
+                        ),
+                      const DropdownMenuItem(
+                        value: 'overdue',
+                        child: Text('Atrasado'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setModalState(() {
+                        tempStatus = value;
+
+                        if (value == 'paid' || value == 'received') {
+                          tempPaidAt ??= DateTime.now();
+                        }
+
+                        if (value == 'pending' || value == 'overdue') {
+                          tempPaidAt = null;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      tempPaidAt != null
+                          ? 'Data de pagamento/recebimento: ${_formatDate(tempPaidAt!)}'
+                          : 'Data de pagamento/recebimento: não informada',
+                    ),
+                    trailing: OutlinedButton(
+                      onPressed: (tempStatus == 'paid' || tempStatus == 'received')
+                          ? () async {
+                              final selected = await showDatePicker(
+                                context: context,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2100),
+                                initialDate: tempPaidAt ?? DateTime.now(),
+                              );
+
+                              if (selected != null) {
+                                setModalState(() => tempPaidAt = selected);
+                              }
+                            }
+                          : null,
+                      child: const Text('Escolher data'),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    await ref.read(transactionControllerProvider).updateStatus(
+                          transactionId: transactionId,
+                          status: tempStatus,
+                          paidAt: tempPaidAt,
+                        );
+
+                    ref.invalidate(transactionsProvider(userId));
+
+                    if (!mounted) return;
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -153,6 +305,10 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                 setState(() {
                                   _selectedType = value.first;
                                   _selectedCategoryId = null;
+                                  _selectedStatus = 'pending';
+                                  _markAsPaid = false;
+                                  _paidAtDate = null;
+                                  _mainDate = DateTime.now();
                                 });
                               },
                             ),
@@ -193,22 +349,96 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                             ListTile(
                               contentPadding: EdgeInsets.zero,
                               title: Text(
-                                'Data: ${_formatDate(_selectedDate)}',
+                                _selectedType == 'expense'
+                                    ? 'Data de vencimento: ${_formatDate(_mainDate)}'
+                                    : 'Data de recebimento: ${_formatDate(_mainDate)}',
                               ),
                               trailing: OutlinedButton(
-                                onPressed: _pickDate,
+                                onPressed: _pickMainDate,
                                 child: const Text('Escolher data'),
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              value: _selectedStatus,
+                              decoration: const InputDecoration(
+                                labelText: 'Status',
+                              ),
+                              items: [
+                                const DropdownMenuItem(
+                                  value: 'pending',
+                                  child: Text('Pendente'),
+                                ),
+                                if (_selectedType == 'expense')
+                                  const DropdownMenuItem(
+                                    value: 'paid',
+                                    child: Text('Pago'),
+                                  ),
+                                if (_selectedType == 'income')
+                                  const DropdownMenuItem(
+                                    value: 'received',
+                                    child: Text('Recebido'),
+                                  ),
+                                const DropdownMenuItem(
+                                  value: 'overdue',
+                                  child: Text('Atrasado'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+
+                                setState(() {
+                                  _selectedStatus = value;
+                                  _markAsPaid =
+                                      value == 'paid' || value == 'received';
+
+                                  if (_markAsPaid) {
+                                    _paidAtDate ??= DateTime.now();
+                                  } else {
+                                    _paidAtDate = null;
+                                  }
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 8),
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              value: _isPaid,
-                              onChanged: (value) {
-                                setState(() => _isPaid = value);
-                              },
-                              title: const Text('Marcar como pago'),
+                              value: _markAsPaid,
+                              onChanged: _syncStatusWithSwitch,
+                              title: Text(
+                                _selectedType == 'expense'
+                                    ? 'Marcar como pago'
+                                    : 'Marcar como recebido',
+                              ),
                               subtitle: const Text(
-                                'Se marcar, a data de pagamento será salva automaticamente',
+                                'Você pode ajustar a data real manualmente',
+                              ),
+                            ),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                _paidAtDate != null
+                                    ? 'Data de pagamento/recebimento: ${_formatDate(_paidAtDate!)}'
+                                    : 'Data de pagamento/recebimento: não informada',
+                              ),
+                              trailing: Wrap(
+                                spacing: 8,
+                                children: [
+                                  OutlinedButton(
+                                    onPressed: (_selectedStatus == 'paid' ||
+                                            _selectedStatus == 'received')
+                                        ? _pickPaidAtDate
+                                        : null,
+                                    child: const Text('Escolher data'),
+                                  ),
+                                  if (_paidAtDate != null)
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() => _paidAtDate = null);
+                                      },
+                                      child: const Text('Limpar'),
+                                    ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -261,32 +491,34 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                   ),
                                   title: Text(transaction.description),
                                   subtitle: Text(
-                                    '${transaction.type == 'income' ? 'Receita' : 'Despesa'} • ${_formatCurrency(transaction.amount)} • ${_formatDate(transaction.transactionDate)}',
+                                    [
+                                      transaction.type == 'income'
+                                          ? 'Receita'
+                                          : 'Despesa',
+                                      _formatCurrency(transaction.amount),
+                                      transaction.type == 'expense'
+                                          ? 'Vencimento: ${_formatDate(transaction.dueDate!)}'
+                                          : 'Recebimento: ${_formatDate(transaction.receivedDate!)}',
+                                      'Status: ${_statusLabel(transaction.status)}',
+                                      if (transaction.paidAt != null)
+                                        'Pago/Recebido em: ${_formatDate(transaction.paidAt!)}',
+                                    ].join(' • '),
                                   ),
                                   trailing: Wrap(
                                     spacing: 8,
                                     children: [
                                       IconButton(
                                         icon: Icon(
-                                          transaction.isPaid
-                                              ? Icons.check_circle
-                                              : Icons.radio_button_unchecked,
-                                          color: transaction.isPaid
-                                              ? Colors.green
-                                              : Colors.white54,
+                                          _statusIcon(transaction.status),
+                                          color: _statusColor(transaction.status),
                                         ),
-                                        onPressed: () async {
-                                          await ref
-                                              .read(transactionControllerProvider)
-                                              .togglePaidStatus(
-                                                transactionId: transaction.id,
-                                                isPaid: !transaction.isPaid,
-                                              );
-
-                                          ref.invalidate(
-                                            transactionsProvider(activeUser.id),
-                                          );
-                                        },
+                                        onPressed: () => _changeStatusDialog(
+                                          transactionId: transaction.id,
+                                          currentStatus: transaction.status,
+                                          currentPaidAt: transaction.paidAt,
+                                          type: transaction.type,
+                                          userId: activeUser.id,
+                                        ),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete_outline),
@@ -342,5 +574,46 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
 
   String _formatCurrency(double value) {
     return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Pendente';
+      case 'paid':
+        return 'Pago';
+      case 'received':
+        return 'Recebido';
+      case 'overdue':
+        return 'Atrasado';
+      default:
+        return status;
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'paid':
+      case 'received':
+        return Icons.check_circle;
+      case 'overdue':
+        return Icons.warning_amber_rounded;
+      case 'pending':
+      default:
+        return Icons.schedule;
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'paid':
+      case 'received':
+        return Colors.green;
+      case 'overdue':
+        return Colors.orange;
+      case 'pending':
+      default:
+        return Colors.white54;
+    }
   }
 }

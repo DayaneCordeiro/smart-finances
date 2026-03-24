@@ -22,8 +22,10 @@ class TransactionController {
     required String type,
     required String description,
     required double amount,
-    required DateTime transactionDate,
-    required bool isPaid,
+    required DateTime? dueDate,
+    required DateTime? receivedDate,
+    required String status,
+    required DateTime? paidAt,
   }) async {
     final trimmedDescription = description.trim();
 
@@ -35,6 +37,14 @@ class TransactionController {
       throw Exception('Valor deve ser maior que zero');
     }
 
+    if (type == 'expense' && dueDate == null) {
+      throw Exception('Data de vencimento é obrigatória');
+    }
+
+    if (type == 'income' && receivedDate == null) {
+      throw Exception('Data de recebimento é obrigatória');
+    }
+
     final transaction = FinanceTransaction(
       id: const Uuid().v4(),
       userId: userId,
@@ -42,22 +52,25 @@ class TransactionController {
       type: type,
       description: trimmedDescription,
       amount: amount,
-      transactionDate: transactionDate,
-      isPaid: isPaid,
-      paidAt: isPaid ? DateTime.now() : null,
+      dueDate: dueDate,
+      receivedDate: receivedDate,
+      status: status,
+      paidAt: paidAt,
       createdAt: DateTime.now(),
     );
 
     await createTransactionUsecase(transaction);
   }
 
-  Future<void> togglePaidStatus({
+  Future<void> updateStatus({
     required String transactionId,
-    required bool isPaid,
+    required String status,
+    required DateTime? paidAt,
   }) async {
     await togglePaidStatusUsecase(
       transactionId: transactionId,
-      isPaid: isPaid,
+      status: status,
+      paidAt: paidAt,
     );
   }
 

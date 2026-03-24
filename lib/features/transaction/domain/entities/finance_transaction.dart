@@ -5,8 +5,9 @@ class FinanceTransaction {
   final String type; // income | expense
   final String description;
   final double amount;
-  final DateTime transactionDate;
-  final bool isPaid;
+  final DateTime? dueDate;
+  final DateTime? receivedDate;
+  final String status; // pending | paid | received | overdue
   final DateTime? paidAt;
   final DateTime createdAt;
 
@@ -17,8 +18,9 @@ class FinanceTransaction {
     required this.type,
     required this.description,
     required this.amount,
-    required this.transactionDate,
-    required this.isPaid,
+    required this.dueDate,
+    required this.receivedDate,
+    required this.status,
     required this.paidAt,
     required this.createdAt,
   });

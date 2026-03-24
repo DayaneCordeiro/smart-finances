@@ -12,7 +12,7 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -21,6 +21,10 @@ class AppDatabase {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createCategoriesTable(db);
+        }
+
+        if (oldVersion < 3) {
+          await db.execute('DROP TABLE IF EXISTS transactions');
           await _createTransactionsTable(db);
         }
       },
@@ -63,8 +67,9 @@ class AppDatabase {
         type TEXT NOT NULL,
         description TEXT NOT NULL,
         amount REAL NOT NULL,
-        transaction_date TEXT NOT NULL,
-        is_paid INTEGER NOT NULL DEFAULT 0,
+        due_date TEXT,
+        received_date TEXT,
+        status TEXT NOT NULL,
         paid_at TEXT,
         created_at TEXT NOT NULL
       )

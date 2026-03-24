@@ -22,23 +22,24 @@ class TransactionLocalDatasource {
       'transactions',
       where: 'user_id = ?',
       whereArgs: [userId],
-      orderBy: 'transaction_date DESC, created_at DESC',
+      orderBy: 'created_at DESC',
     );
 
     return result.map(FinanceTransactionModel.fromMap).toList();
   }
 
-  Future<void> togglePaidStatus({
+  Future<void> updateStatus({
     required String transactionId,
-    required bool isPaid,
+    required String status,
+    required DateTime? paidAt,
   }) async {
     final db = await _db;
 
     await db.update(
       'transactions',
       {
-        'is_paid': isPaid ? 1 : 0,
-        'paid_at': isPaid ? DateTime.now().toIso8601String() : null,
+        'status': status,
+        'paid_at': paidAt?.toIso8601String(),
       },
       where: 'id = ?',
       whereArgs: [transactionId],

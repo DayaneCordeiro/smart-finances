@@ -7,11 +7,13 @@ class ToggleTransactionPaidStatus {
 
   Future<void> call({
     required String transactionId,
-    required bool isPaid,
+    required String status,
+    required DateTime? paidAt,
   }) async {
-    await repository.togglePaidStatus(
+    await repository.updateStatus(
       transactionId: transactionId,
-      isPaid: isPaid,
+      status: status,
+      paidAt: paidAt,
     );
   }
 }

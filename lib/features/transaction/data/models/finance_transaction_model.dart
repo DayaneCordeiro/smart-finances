@@ -7,8 +7,9 @@ class FinanceTransactionModel {
   final String type;
   final String description;
   final double amount;
-  final DateTime transactionDate;
-  final bool isPaid;
+  final DateTime? dueDate;
+  final DateTime? receivedDate;
+  final String status;
   final DateTime? paidAt;
   final DateTime createdAt;
 
@@ -19,8 +20,9 @@ class FinanceTransactionModel {
     required this.type,
     required this.description,
     required this.amount,
-    required this.transactionDate,
-    required this.isPaid,
+    required this.dueDate,
+    required this.receivedDate,
+    required this.status,
     required this.paidAt,
     required this.createdAt,
   });
@@ -33,8 +35,9 @@ class FinanceTransactionModel {
       type: entity.type,
       description: entity.description,
       amount: entity.amount,
-      transactionDate: entity.transactionDate,
-      isPaid: entity.isPaid,
+      dueDate: entity.dueDate,
+      receivedDate: entity.receivedDate,
+      status: entity.status,
       paidAt: entity.paidAt,
       createdAt: entity.createdAt,
     );
@@ -48,8 +51,9 @@ class FinanceTransactionModel {
       type: type,
       description: description,
       amount: amount,
-      transactionDate: transactionDate,
-      isPaid: isPaid,
+      dueDate: dueDate,
+      receivedDate: receivedDate,
+      status: status,
       paidAt: paidAt,
       createdAt: createdAt,
     );
@@ -63,8 +67,9 @@ class FinanceTransactionModel {
       'type': type,
       'description': description,
       'amount': amount,
-      'transaction_date': transactionDate.toIso8601String(),
-      'is_paid': isPaid ? 1 : 0,
+      'due_date': dueDate?.toIso8601String(),
+      'received_date': receivedDate?.toIso8601String(),
+      'status': status,
       'paid_at': paidAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
     };
@@ -78,8 +83,13 @@ class FinanceTransactionModel {
       type: map['type'] as String,
       description: map['description'] as String,
       amount: (map['amount'] as num).toDouble(),
-      transactionDate: DateTime.parse(map['transaction_date'] as String),
-      isPaid: (map['is_paid'] as int) == 1,
+      dueDate: map['due_date'] != null
+          ? DateTime.parse(map['due_date'] as String)
+          : null,
+      receivedDate: map['received_date'] != null
+          ? DateTime.parse(map['received_date'] as String)
+          : null,
+      status: map['status'] as String,
       paidAt: map['paid_at'] != null
           ? DateTime.parse(map['paid_at'] as String)
           : null,
