@@ -9,17 +9,28 @@ enum MonthMood {
 
 class MonthMoodCard extends StatelessWidget {
   final double balance;
+  final int overdueCount;
 
   const MonthMoodCard({
     super.key,
     required this.balance,
+    required this.overdueCount,
   });
 
   MonthMood get mood {
-    if (balance >= 100) return MonthMood.happy;
-    if (balance >= 50) return MonthMood.ok;
-    if (balance >= -200) return MonthMood.warning;
-    return MonthMood.sad;
+    if (overdueCount >= 3 || balance < -500) {
+      return MonthMood.sad;
+    }
+
+    if (overdueCount > 0 || balance < 0) {
+      return MonthMood.warning;
+    }
+
+    if (balance >= 1000) {
+      return MonthMood.happy;
+    }
+
+    return MonthMood.ok;
   }
 
   String get title {
@@ -38,13 +49,13 @@ class MonthMoodCard extends StatelessWidget {
   String get description {
     switch (mood) {
       case MonthMood.happy:
-        return 'Saldo bem positivo. Você está conseguindo manter uma boa folga no mês.';
+        return 'Saldo positivo e sem sinais importantes de atraso.';
       case MonthMood.ok:
-        return 'Saldo positivo, mas sem muita sobra. Vale acompanhar os próximos gastos.';
+        return 'Tudo sob controle por enquanto. Continue acompanhando.';
       case MonthMood.warning:
-        return 'Saldo baixo ou levemente negativo. Talvez seja hora de revisar despesas e parcelas.';
+        return 'Há sinais de atenção no mês, como saldo apertado ou itens atrasados.';
       case MonthMood.sad:
-        return 'Saldo bem negativo no momento. O ideal é revisar gastos, dívidas e vencimentos.';
+        return 'O mês pede cuidado. Saldo ruim ou muitos atrasos detectados.';
     }
   }
 
@@ -155,6 +166,13 @@ class MonthMoodCard extends StatelessWidget {
                     'Saldo atual: ${_formatCurrency(balance)}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Itens atrasados: $overdueCount',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
                         ),
                   ),
                 ],

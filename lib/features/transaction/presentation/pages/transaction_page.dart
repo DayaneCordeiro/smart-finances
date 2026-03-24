@@ -25,6 +25,41 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
   DateTime _mainDate = DateTime.now();
   DateTime? _paidAtDate;
 
+  String _effectiveStatusForDisplay(transaction) {
+    if (transaction.status == 'paid' || transaction.status == 'received') {
+      return transaction.status;
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (transaction.type == 'expense' && transaction.dueDate != null) {
+      final dueDate = DateTime(
+        transaction.dueDate.year,
+        transaction.dueDate.month,
+        transaction.dueDate.day,
+      );
+
+      if (transaction.status == 'pending' && dueDate.isBefore(today)) {
+        return 'overdue';
+      }
+    }
+
+    if (transaction.type == 'income' && transaction.receivedDate != null) {
+      final receivedDate = DateTime(
+        transaction.receivedDate.year,
+        transaction.receivedDate.month,
+        transaction.receivedDate.day,
+      );
+
+      if (transaction.status == 'pending' && receivedDate.isBefore(today)) {
+        return 'overdue';
+      }
+    }
+
+    return transaction.status;
+  }
+
   @override
   void dispose() {
     _descriptionController.dispose();
@@ -479,6 +514,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                 const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final transaction = transactions[index];
+                              final effectiveStatus = _effectiveStatusForDisplay(transaction);
 
                               return Card(
                                 child: ListTile(
@@ -499,7 +535,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                       transaction.type == 'expense'
                                           ? 'Vencimento: ${_formatDate(transaction.dueDate!)}'
                                           : 'Recebimento: ${_formatDate(transaction.receivedDate!)}',
-                                      'Status: ${_statusLabel(transaction.status)}',
+                                      'Status: ${_statusLabel(effectiveStatus)}',
                                       if (transaction.paidAt != null)
                                         'Pago/Recebido em: ${_formatDate(transaction.paidAt!)}',
                                     ].join(' • '),
@@ -509,8 +545,8 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                     children: [
                                       IconButton(
                                         icon: Icon(
-                                          _statusIcon(transaction.status),
-                                          color: _statusColor(transaction.status),
+                                          _statusIcon(effectiveStatus),
+                                          color: _statusColor(effectiveStatus),
                                         ),
                                         onPressed: () => _changeStatusDialog(
                                           transactionId: transaction.id,

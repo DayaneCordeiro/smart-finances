@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../user/presentation/controllers/user_providers.dart';
-import '../../../user/presentation/pages/user_list_page.dart';
-import '../widgets/month_mood_card.dart';
 import '../../../category/presentation/pages/category_page.dart';
 import '../../../transaction/presentation/pages/transaction_page.dart';
+import '../../../user/presentation/controllers/user_providers.dart';
 import '../../../user/presentation/pages/user_list_page.dart';
+import '../controllers/dashboard_providers.dart';
 import '../widgets/month_mood_card.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -15,6 +14,7 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeUserAsync = ref.watch(activeUserProvider);
+    final summaryAsync = ref.watch(dashboardActiveUserSummaryProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -25,53 +25,74 @@ class DashboardPage extends ConsumerWidget {
             Expanded(
               child: activeUserAsync.when(
                 data: (activeUser) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          runSpacing: 16,
-                          spacing: 16,
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                  return summaryAsync.when(
+                    data: (summary) {
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            Wrap(
+                              runSpacing: 16,
+                              spacing: 16,
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Text(
-                                  'Smart Finances',
-                                  style: textTheme.headlineMedium,
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Smart Finances',
+                                      style: textTheme.headlineMedium,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      activeUser != null
+                                          ? 'Olá, ${activeUser.name}'
+                                          : 'Nenhum usuário ativo',
+                                      style: textTheme.bodyLarge?.copyWith(
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  activeUser != null
-                                      ? 'Olá, ${activeUser.name}'
-                                      : 'Nenhum usuário ativo',
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    color: Colors.white70,
-                                  ),
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const TransactionPage(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Nova transação'),
                                 ),
                               ],
                             ),
-                            FilledButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(Icons.add),
-                              label: const Text('Nova transação'),
+                            const SizedBox(height: 24),
+                            _MonthHighlightCard(
+                              balance: summary?.balance ?? 0,
                             ),
+                            const SizedBox(height: 20),
+                            MonthMoodCard(
+                              balance: summary?.balance ?? 0,
+                              overdueCount: summary?.overdueCount ?? 0,
+                            ),
+                            const SizedBox(height: 20),
+                            _SummaryCardsSection(summary: summary),
+                            const SizedBox(height: 20),
+                            _ChartsAndAlertsSection(summary: summary),
+                            const SizedBox(height: 20),
+                            const _QuickActionsSection(),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        const _MonthHighlightCard(),
-                        const SizedBox(height: 20),
-                        const MonthMoodCard(balance: 250),
-                        const SizedBox(height: 20),
-                        const _SummaryCardsSection(),
-                        const SizedBox(height: 20),
-                        const _ChartsAndAlertsSection(),
-                        const SizedBox(height: 20),
-                        const _QuickActionsSection(),
-                      ],
+                      );
+                    },
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    error: (error, stack) => Center(
+                      child: Text('Erro ao carregar resumo: $error'),
                     ),
                   );
                 },
@@ -168,9 +189,7 @@ class _DashboardSidebar extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () {
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => const UserListPage(),
-                ),
+                MaterialPageRoute(builder: (_) => const UserListPage()),
               );
             },
             icon: const Icon(Icons.person_outline),
@@ -238,10 +257,16 @@ class _SidebarItem extends StatelessWidget {
 }
 
 class _MonthHighlightCard extends StatelessWidget {
-  const _MonthHighlightCard();
+  final double balance;
+
+  const _MonthHighlightCard({
+    required this.balance,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -262,27 +287,27 @@ class _MonthHighlightCard extends StatelessWidget {
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'Visão geral do mês',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 15,
                 ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                'Março 2026',
-                style: TextStyle(
+                _monthLabel(now),
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                'Sua central financeira com foco em gastos, dívidas e metas.',
+              const SizedBox(height: 8),
+              const Text(
+                'Sua central financeira com foco em receitas, despesas e controle mensal.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 15,
@@ -296,17 +321,17 @@ class _MonthHighlightCard extends StatelessWidget {
               color: Colors.white.withOpacity(0.08),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Saldo atual',
                   style: TextStyle(color: Colors.white70),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
-                  'R\$ 0,00',
-                  style: TextStyle(
+                  _formatCurrency(balance),
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                   ),
@@ -318,43 +343,76 @@ class _MonthHighlightCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _monthLabel(DateTime date) {
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+
+    return '${months[date.month - 1]} ${date.year}';
+  }
+
+  static String _formatCurrency(double value) {
+    final isNegative = value < 0;
+    final absValue = value.abs().toStringAsFixed(2).replaceAll('.', ',');
+    return isNegative ? '-R\$ $absValue' : 'R\$ $absValue';
+  }
 }
 
 class _SummaryCardsSection extends StatelessWidget {
-  const _SummaryCardsSection();
+  final dynamic summary;
+
+  const _SummaryCardsSection({
+    required this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const Wrap(
+    return Wrap(
       spacing: 16,
       runSpacing: 16,
       children: [
         _SummaryCard(
           title: 'Entradas',
-          value: 'R\$ 0,00',
+          value: _formatCurrency(summary?.totalIncome ?? 0),
           subtitle: 'Receitas do mês',
           icon: Icons.arrow_downward_rounded,
         ),
         _SummaryCard(
           title: 'Saídas',
-          value: 'R\$ 0,00',
+          value: _formatCurrency(summary?.totalExpense ?? 0),
           subtitle: 'Despesas do mês',
           icon: Icons.arrow_upward_rounded,
         ),
         _SummaryCard(
-          title: 'Dívidas em aberto',
-          value: 'R\$ 0,00',
-          subtitle: 'Parcelas pendentes',
-          icon: Icons.receipt_long_outlined,
+          title: 'Pendentes',
+          value: _formatCurrency(summary?.pendingTotal ?? 0),
+          subtitle: 'Itens pendentes ou atrasados',
+          icon: Icons.schedule,
         ),
         _SummaryCard(
-          title: 'Alertas',
-          value: '0',
-          subtitle: 'Vencimentos próximos',
-          icon: Icons.notifications_active_outlined,
+          title: 'Atrasados',
+          value: '${summary?.overdueCount ?? 0}',
+          subtitle: 'Lançamentos vencidos',
+          icon: Icons.warning_amber_rounded,
         ),
       ],
     );
+  }
+
+  String _formatCurrency(double value) {
+    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
   }
 }
 
@@ -414,30 +472,39 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ChartsAndAlertsSection extends StatelessWidget {
-  const _ChartsAndAlertsSection();
+  final dynamic summary;
+
+  const _ChartsAndAlertsSection({
+    required this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Expanded(
+        Expanded(
           flex: 2,
-          child: _ExpensesChartPlaceholder(),
+          child: _FinancialOverviewCard(summary: summary),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
-            children: const [
+            children: [
               _AlertCard(
-                title: 'Conta próxima do vencimento',
-                description: 'Nenhuma conta cadastrada ainda.',
+                title: 'Itens atrasados',
+                description:
+                    (summary?.overdueCount ?? 0) > 0
+                        ? 'Você tem ${summary.overdueCount} item(ns) atrasado(s) neste mês.'
+                        : 'Nenhum item atrasado neste mês.',
                 icon: Icons.alarm,
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _AlertCard(
-                title: 'Limite do orçamento',
-                description: 'Cadastre categorias para acompanhar metas.',
+                title: 'Situação do saldo',
+                description: (summary?.balance ?? 0) >= 0
+                    ? 'Seu saldo do mês está positivo.'
+                    : 'Seu saldo do mês está negativo.',
                 icon: Icons.pie_chart_outline,
               ),
             ],
@@ -448,11 +515,21 @@ class _ChartsAndAlertsSection extends StatelessWidget {
   }
 }
 
-class _ExpensesChartPlaceholder extends StatelessWidget {
-  const _ExpensesChartPlaceholder();
+class _FinancialOverviewCard extends StatelessWidget {
+  final dynamic summary;
+
+  const _FinancialOverviewCard({
+    required this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final totalIncome = summary?.totalIncome ?? 0.0;
+    final totalExpense = summary?.totalExpense ?? 0.0;
+    final balance = summary?.balance ?? 0.0;
+    final paidOrReceived = summary?.paidOrReceivedTotal ?? 0.0;
+    final pending = summary?.pendingTotal ?? 0.0;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(22),
@@ -460,34 +537,71 @@ class _ExpensesChartPlaceholder extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Evolução financeira',
+              'Resumo financeiro',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Depois vamos plugar os gráficos reais aqui.',
+              'Visão consolidada do mês atual.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white70,
                   ),
             ),
             const SizedBox(height: 24),
-            Container(
-              height: 260,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.show_chart_rounded,
-                  size: 60,
-                  color: Colors.white54,
-                ),
-              ),
+            _InfoRow(label: 'Receitas', value: _formatCurrency(totalIncome)),
+            const SizedBox(height: 12),
+            _InfoRow(label: 'Despesas', value: _formatCurrency(totalExpense)),
+            const SizedBox(height: 12),
+            _InfoRow(
+              label: 'Pago/Recebido',
+              value: _formatCurrency(paidOrReceived),
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(label: 'Pendentes', value: _formatCurrency(pending)),
+            const Divider(height: 32),
+            _InfoRow(
+              label: 'Saldo do mês',
+              value: _formatCurrency(balance),
+              isHighlight: true,
             ),
           ],
         ),
       ),
+    );
+  }
+
+  String _formatCurrency(double value) {
+    final isNegative = value < 0;
+    final absValue = value.abs().toStringAsFixed(2).replaceAll('.', ',');
+    return isNegative ? '-R\$ $absValue' : 'R\$ $absValue';
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isHighlight;
+
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    this.isHighlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = isHighlight
+        ? Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            )
+        : Theme.of(context).textTheme.bodyLarge;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: style),
+        Text(value, style: style),
+      ],
     );
   }
 }
