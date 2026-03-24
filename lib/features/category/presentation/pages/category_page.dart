@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../controllers/category_providers.dart';
 
@@ -22,6 +23,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     super.dispose();
   }
 
+  void _refreshDashboard(String userId) {
+    ref.invalidate(monthlyTransactionsProvider(userId));
+    ref.invalidate(monthlySummaryProvider(userId));
+    ref.invalidate(dashboardActiveUserSummaryProvider);
+  }
+
   Future<void> _saveCategory(String userId) async {
     setState(() => _isSaving = true);
 
@@ -34,6 +41,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
 
       _nameController.clear();
       ref.invalidate(categoriesProvider(userId));
+      _refreshDashboard(userId);
 
       if (!mounted) return;
 
@@ -165,6 +173,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                                       .deleteCategory(category.id);
 
                                   ref.invalidate(categoriesProvider(activeUser.id));
+                                  _refreshDashboard(activeUser.id);
                                 },
                               ),
                             ),

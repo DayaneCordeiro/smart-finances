@@ -12,22 +12,36 @@ class GetMonthlySummary {
     for (final transaction in transactions) {
       final effectiveStatus = _effectiveStatus(transaction);
 
+      final isRealized =
+          effectiveStatus == 'paid' || effectiveStatus == 'received';
+      final isPendingLike =
+          effectiveStatus == 'pending' || effectiveStatus == 'overdue';
+
       if (transaction.type == 'income') {
-        totalIncome += transaction.amount;
-      } else if (transaction.type == 'expense') {
-        totalExpense += transaction.amount;
+        if (effectiveStatus == 'received') {
+          totalIncome += transaction.amount;
+        }
+
+        if (isPendingLike) {
+          pendingTotal += transaction.amount;
+        }
       }
 
-      if (effectiveStatus == 'paid' || effectiveStatus == 'received') {
+      if (transaction.type == 'expense') {
+        if (effectiveStatus == 'paid') {
+          totalExpense += transaction.amount;
+        }
+
+        if (isPendingLike) {
+          pendingTotal += transaction.amount;
+        }
+      }
+
+      if (isRealized) {
         paidOrReceivedTotal += transaction.amount;
       }
 
-      if (effectiveStatus == 'pending') {
-        pendingTotal += transaction.amount;
-      }
-
       if (effectiveStatus == 'overdue') {
-        pendingTotal += transaction.amount;
         overdueCount++;
       }
     }

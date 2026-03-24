@@ -44,7 +44,6 @@ final transactionControllerProvider = Provider<TransactionController>((ref) {
   );
 });
 
-final transactionsProvider =
-    FutureProvider.family((ref, String userId) async {
+final transactionsProvider = FutureProvider.family((ref, String userId) async {
   return ref.read(getTransactionsByUserProvider).call(userId);
 });

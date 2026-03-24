@@ -5,6 +5,7 @@ import '../../../category/presentation/pages/category_page.dart';
 import '../../../transaction/presentation/pages/transaction_page.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../../../user/presentation/pages/user_list_page.dart';
+import '../../domain/entities/monthly_summary.dart';
 import '../controllers/dashboard_providers.dart';
 import '../widgets/month_mood_card.dart';
 
@@ -307,7 +308,7 @@ class _MonthHighlightCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Sua central financeira com foco em receitas, despesas e controle mensal.',
+                'Seu saldo atual considera apenas o que já foi pago ou recebido.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 15,
@@ -371,7 +372,7 @@ class _MonthHighlightCard extends StatelessWidget {
 }
 
 class _SummaryCardsSection extends StatelessWidget {
-  final dynamic summary;
+  final MonthlySummary? summary;
 
   const _SummaryCardsSection({
     required this.summary,
@@ -379,33 +380,52 @@ class _SummaryCardsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
+    return Column(
       children: [
-        _SummaryCard(
-          title: 'Entradas',
-          value: _formatCurrency(summary?.totalIncome ?? 0),
-          subtitle: 'Receitas do mês',
-          icon: Icons.arrow_downward_rounded,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _SummaryCard(
+                title: 'Entradas',
+                value: _formatCurrency(summary?.totalIncome ?? 0),
+                subtitle: 'Receitas recebidas no mês',
+                icon: Icons.arrow_downward_rounded,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _SummaryCard(
+                title: 'Saídas',
+                value: _formatCurrency(summary?.totalExpense ?? 0),
+                subtitle: 'Despesas pagas no mês',
+                icon: Icons.arrow_upward_rounded,
+              ),
+            ),
+          ],
         ),
-        _SummaryCard(
-          title: 'Saídas',
-          value: _formatCurrency(summary?.totalExpense ?? 0),
-          subtitle: 'Despesas do mês',
-          icon: Icons.arrow_upward_rounded,
-        ),
-        _SummaryCard(
-          title: 'Pendentes',
-          value: _formatCurrency(summary?.pendingTotal ?? 0),
-          subtitle: 'Itens pendentes ou atrasados',
-          icon: Icons.schedule,
-        ),
-        _SummaryCard(
-          title: 'Atrasados',
-          value: '${summary?.overdueCount ?? 0}',
-          subtitle: 'Lançamentos vencidos',
-          icon: Icons.warning_amber_rounded,
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _SummaryCard(
+                title: 'Pendentes',
+                value: _formatCurrency(summary?.pendingTotal ?? 0),
+                subtitle: 'Itens pendentes ou atrasados',
+                icon: Icons.schedule,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _SummaryCard(
+                title: 'Atrasados',
+                value: '${summary?.overdueCount ?? 0}',
+                subtitle: 'Lançamentos vencidos',
+                icon: Icons.warning_amber_rounded,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -431,11 +451,11 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 260,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 165),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -452,6 +472,8 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -459,6 +481,8 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 subtitle,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
                     ),
@@ -472,7 +496,7 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ChartsAndAlertsSection extends StatelessWidget {
-  final dynamic summary;
+  final MonthlySummary? summary;
 
   const _ChartsAndAlertsSection({
     required this.summary,
@@ -480,43 +504,72 @@ class _ChartsAndAlertsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: _FinancialOverviewCard(summary: summary),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 900;
+
+        if (isCompact) {
+          return Column(
             children: [
+              _FinancialOverviewCard(summary: summary),
+              const SizedBox(height: 16),
               _AlertCard(
                 title: 'Itens atrasados',
-                description:
-                    (summary?.overdueCount ?? 0) > 0
-                        ? 'Você tem ${summary.overdueCount} item(ns) atrasado(s) neste mês.'
-                        : 'Nenhum item atrasado neste mês.',
+                description: (summary?.overdueCount ?? 0) > 0
+                    ? 'Você tem ${summary!.overdueCount} item(ns) atrasado(s) neste mês.'
+                    : 'Nenhum item atrasado neste mês.',
                 icon: Icons.alarm,
               ),
               const SizedBox(height: 16),
               _AlertCard(
                 title: 'Situação do saldo',
                 description: (summary?.balance ?? 0) >= 0
-                    ? 'Seu saldo do mês está positivo.'
-                    : 'Seu saldo do mês está negativo.',
+                    ? 'Seu saldo atual está positivo.'
+                    : 'Seu saldo atual está negativo.',
                 icon: Icons.pie_chart_outline,
               ),
             ],
-          ),
-        ),
-      ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: _FinancialOverviewCard(summary: summary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                children: [
+                  _AlertCard(
+                    title: 'Itens atrasados',
+                    description: (summary?.overdueCount ?? 0) > 0
+                        ? 'Você tem ${summary!.overdueCount} item(ns) atrasado(s) neste mês.'
+                        : 'Nenhum item atrasado neste mês.',
+                    icon: Icons.alarm,
+                  ),
+                  const SizedBox(height: 16),
+                  _AlertCard(
+                    title: 'Situação do saldo',
+                    description: (summary?.balance ?? 0) >= 0
+                        ? 'Seu saldo atual está positivo.'
+                        : 'Seu saldo atual está negativo.',
+                    icon: Icons.pie_chart_outline,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _FinancialOverviewCard extends StatelessWidget {
-  final dynamic summary;
+  final MonthlySummary? summary;
 
   const _FinancialOverviewCard({
     required this.summary,
@@ -527,7 +580,6 @@ class _FinancialOverviewCard extends StatelessWidget {
     final totalIncome = summary?.totalIncome ?? 0.0;
     final totalExpense = summary?.totalExpense ?? 0.0;
     final balance = summary?.balance ?? 0.0;
-    final paidOrReceived = summary?.paidOrReceivedTotal ?? 0.0;
     final pending = summary?.pendingTotal ?? 0.0;
 
     return Card(
@@ -542,25 +594,29 @@ class _FinancialOverviewCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Visão consolidada do mês atual.',
+              'Valores realizados e pendentes do mês atual.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white70,
                   ),
             ),
             const SizedBox(height: 24),
-            _InfoRow(label: 'Receitas', value: _formatCurrency(totalIncome)),
-            const SizedBox(height: 12),
-            _InfoRow(label: 'Despesas', value: _formatCurrency(totalExpense)),
-            const SizedBox(height: 12),
             _InfoRow(
-              label: 'Pago/Recebido',
-              value: _formatCurrency(paidOrReceived),
+              label: 'Receitas recebidas',
+              value: _formatCurrency(totalIncome),
             ),
             const SizedBox(height: 12),
-            _InfoRow(label: 'Pendentes', value: _formatCurrency(pending)),
+            _InfoRow(
+              label: 'Despesas pagas',
+              value: _formatCurrency(totalExpense),
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(
+              label: 'Pendentes/atrasados',
+              value: _formatCurrency(pending),
+            ),
             const Divider(height: 32),
             _InfoRow(
-              label: 'Saldo do mês',
+              label: 'Saldo atual',
               value: _formatCurrency(balance),
               isHighlight: true,
             ),
@@ -596,12 +652,42 @@ class _InfoRow extends StatelessWidget {
             )
         : Theme.of(context).textTheme.bodyLarge;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: style),
-        Text(value, style: style),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 380;
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: style),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: style,
+                textAlign: TextAlign.left,
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(label, style: style),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                value,
+                style: style,
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

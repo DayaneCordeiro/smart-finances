@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../category/presentation/controllers/category_providers.dart';
+import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../controllers/transaction_providers.dart';
 
@@ -25,46 +26,18 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
   DateTime _mainDate = DateTime.now();
   DateTime? _paidAtDate;
 
-  String _effectiveStatusForDisplay(transaction) {
-    if (transaction.status == 'paid' || transaction.status == 'received') {
-      return transaction.status;
-    }
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    if (transaction.type == 'expense' && transaction.dueDate != null) {
-      final dueDate = DateTime(
-        transaction.dueDate.year,
-        transaction.dueDate.month,
-        transaction.dueDate.day,
-      );
-
-      if (transaction.status == 'pending' && dueDate.isBefore(today)) {
-        return 'overdue';
-      }
-    }
-
-    if (transaction.type == 'income' && transaction.receivedDate != null) {
-      final receivedDate = DateTime(
-        transaction.receivedDate.year,
-        transaction.receivedDate.month,
-        transaction.receivedDate.day,
-      );
-
-      if (transaction.status == 'pending' && receivedDate.isBefore(today)) {
-        return 'overdue';
-      }
-    }
-
-    return transaction.status;
-  }
-
   @override
   void dispose() {
     _descriptionController.dispose();
     _amountController.dispose();
     super.dispose();
+  }
+
+  void _refreshFinancialData(String userId) {
+    ref.invalidate(transactionsProvider(userId));
+    ref.invalidate(monthlyTransactionsProvider(userId));
+    ref.invalidate(monthlySummaryProvider(userId));
+    ref.invalidate(dashboardActiveUserSummaryProvider);
   }
 
   Future<void> _pickMainDate() async {
@@ -152,7 +125,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
         _paidAtDate = null;
       });
 
-      ref.invalidate(transactionsProvider(userId));
+      _refreshFinancialData(userId);
 
       if (!mounted) return;
 
@@ -274,7 +247,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                           paidAt: tempPaidAt,
                         );
 
-                    ref.invalidate(transactionsProvider(userId));
+                    _refreshFinancialData(userId);
 
                     if (!mounted) return;
                     Navigator.of(context).pop();
@@ -287,6 +260,41 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
         );
       },
     );
+  }
+
+  String _effectiveStatusForDisplay(dynamic transaction) {
+    if (transaction.status == 'paid' || transaction.status == 'received') {
+      return transaction.status;
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (transaction.type == 'expense' && transaction.dueDate != null) {
+      final dueDate = DateTime(
+        transaction.dueDate.year,
+        transaction.dueDate.month,
+        transaction.dueDate.day,
+      );
+
+      if (transaction.status == 'pending' && dueDate.isBefore(today)) {
+        return 'overdue';
+      }
+    }
+
+    if (transaction.type == 'income' && transaction.receivedDate != null) {
+      final receivedDate = DateTime(
+        transaction.receivedDate.year,
+        transaction.receivedDate.month,
+        transaction.receivedDate.day,
+      );
+
+      if (transaction.status == 'pending' && receivedDate.isBefore(today)) {
+        return 'overdue';
+      }
+    }
+
+    return transaction.status;
   }
 
   @override
@@ -514,7 +522,8 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                 const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final transaction = transactions[index];
-                              final effectiveStatus = _effectiveStatusForDisplay(transaction);
+                              final effectiveStatus =
+                                  _effectiveStatusForDisplay(transaction);
 
                               return Card(
                                 child: ListTile(
@@ -557,15 +566,48 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                         ),
                                       ),
                                       IconButton(
+                                        tooltip: 'Reaproveitar no próximo mês',
+                                        icon: const Icon(Icons.copy_outlined),
+                                        onPressed: () async {
+                                          try {
+                                            await ref
+                                                .read(transactionControllerProvider)
+                                                .reuseTransactionNextMonth(
+                                                  transaction,
+                                                );
+
+                                            _refreshFinancialData(activeUser.id);
+
+                                            if (!mounted) return;
+
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Transação reaproveitada para o próximo mês',
+                                                ),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            if (!mounted) return;
+
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Erro ao reaproveitar transação: $e',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                      IconButton(
                                         icon: const Icon(Icons.delete_outline),
                                         onPressed: () async {
                                           await ref
                                               .read(transactionControllerProvider)
                                               .deleteTransaction(transaction.id);
 
-                                          ref.invalidate(
-                                            transactionsProvider(activeUser.id),
-                                          );
+                                          _refreshFinancialData(activeUser.id);
                                         },
                                       ),
                                     ],

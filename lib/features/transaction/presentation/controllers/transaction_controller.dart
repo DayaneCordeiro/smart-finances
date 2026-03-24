@@ -77,4 +77,45 @@ class TransactionController {
   Future<void> deleteTransaction(String transactionId) async {
     await deleteTransactionUsecase(transactionId);
   }
+
+  Future<void> reuseTransactionNextMonth(FinanceTransaction transaction) async {
+    final referenceDate = transaction.type == 'expense'
+        ? transaction.dueDate
+        : transaction.receivedDate;
+
+    if (referenceDate == null) {
+      throw Exception('Transação sem data base para reaproveitar');
+    }
+
+    final nextMonthDate = _addOneMonth(referenceDate);
+
+    final duplicated = FinanceTransaction(
+      id: const Uuid().v4(),
+      userId: transaction.userId,
+      categoryId: transaction.categoryId,
+      type: transaction.type,
+      description: transaction.description,
+      amount: transaction.amount,
+      dueDate: transaction.type == 'expense' ? nextMonthDate : null,
+      receivedDate: transaction.type == 'income' ? nextMonthDate : null,
+      status: 'pending',
+      paidAt: null,
+      createdAt: DateTime.now(),
+    );
+
+    await createTransactionUsecase(duplicated);
+  }
+
+  DateTime _addOneMonth(DateTime date) {
+    final nextMonth = date.month == 12 ? 1 : date.month + 1;
+    final nextYear = date.month == 12 ? date.year + 1 : date.year;
+
+    final monthAfterNext = nextMonth == 12 ? 1 : nextMonth + 1;
+    final yearOfMonthAfterNext = nextMonth == 12 ? nextYear + 1 : nextYear;
+
+    final lastDay = DateTime(yearOfMonthAfterNext, monthAfterNext, 0).day;
+    final safeDay = date.day > lastDay ? lastDay : date.day;
+
+    return DateTime(nextYear, nextMonth, safeDay);
+  }
 }

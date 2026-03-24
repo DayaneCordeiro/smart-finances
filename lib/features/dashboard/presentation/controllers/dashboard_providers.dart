@@ -12,7 +12,7 @@ final getMonthlySummaryProvider = Provider<GetMonthlySummary>((ref) {
 final monthlyTransactionsProvider =
     FutureProvider.family((ref, String userId) async {
   final transactions =
-      await ref.read(getTransactionsByUserProvider).call(userId);
+      await ref.watch(transactionsProvider(userId).future);
 
   final now = DateTime.now();
 
@@ -29,7 +29,8 @@ final monthlyTransactionsProvider =
 
 final monthlySummaryProvider =
     FutureProvider.family<MonthlySummary, String>((ref, userId) async {
-  final transactions = await ref.watch(monthlyTransactionsProvider(userId).future);
+  final transactions =
+      await ref.watch(monthlyTransactionsProvider(userId).future);
   final usecase = ref.read(getMonthlySummaryProvider);
   return usecase.call(transactions);
 });
