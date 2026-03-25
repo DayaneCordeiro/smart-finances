@@ -7,6 +7,7 @@ import '../../domain/usecases/create_transaction.dart';
 import '../../domain/usecases/delete_transaction.dart';
 import '../../domain/usecases/get_transactions_by_user.dart';
 import '../../domain/usecases/toggle_transaction_paid_status.dart';
+import '../../domain/usecases/update_transaction.dart';
 import 'transaction_controller.dart';
 
 final transactionLocalDatasourceProvider =
@@ -21,6 +22,10 @@ final transactionRepositoryProvider =
 
 final createTransactionProvider = Provider<CreateTransaction>((ref) {
   return CreateTransaction(ref.read(transactionRepositoryProvider));
+});
+
+final updateTransactionProvider = Provider<UpdateTransaction>((ref) {
+  return UpdateTransaction(ref.read(transactionRepositoryProvider));
 });
 
 final getTransactionsByUserProvider = Provider<GetTransactionsByUser>((ref) {
@@ -39,6 +44,7 @@ final deleteTransactionProvider = Provider<DeleteTransaction>((ref) {
 final transactionControllerProvider = Provider<TransactionController>((ref) {
   return TransactionController(
     createTransactionUsecase: ref.read(createTransactionProvider),
+    updateTransactionUsecase: ref.read(updateTransactionProvider),
     togglePaidStatusUsecase: ref.read(toggleTransactionPaidStatusProvider),
     deleteTransactionUsecase: ref.read(deleteTransactionProvider),
   );

@@ -15,9 +15,18 @@ class TransactionLocalDatasource {
     await db.insert('transactions', transaction.toMap());
   }
 
-  Future<List<FinanceTransactionModel>> getTransactionsByUser(
-    String userId,
-  ) async {
+  Future<void> updateTransaction(FinanceTransactionModel transaction) async {
+    final db = await _db;
+
+    await db.update(
+      'transactions',
+      transaction.toMap(),
+      where: 'id = ?',
+      whereArgs: [transaction.id],
+    );
+  }
+
+  Future<List<FinanceTransactionModel>> getTransactionsByUser(String userId) async {
     final db = await _db;
 
     final result = await db.query(

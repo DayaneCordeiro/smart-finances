@@ -2,6 +2,7 @@ import '../entities/finance_transaction.dart';
 
 abstract class TransactionRepository {
   Future<void> createTransaction(FinanceTransaction transaction);
+  Future<void> updateTransaction(FinanceTransaction transaction);
   Future<List<FinanceTransaction>> getTransactionsByUser(String userId);
   Future<void> updateStatus({
     required String transactionId,

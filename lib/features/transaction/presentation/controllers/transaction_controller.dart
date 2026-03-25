@@ -4,14 +4,17 @@ import '../../domain/entities/finance_transaction.dart';
 import '../../domain/usecases/create_transaction.dart';
 import '../../domain/usecases/delete_transaction.dart';
 import '../../domain/usecases/toggle_transaction_paid_status.dart';
+import '../../domain/usecases/update_transaction.dart';
 
 class TransactionController {
   final CreateTransaction createTransactionUsecase;
+  final UpdateTransaction updateTransactionUsecase;
   final ToggleTransactionPaidStatus togglePaidStatusUsecase;
   final DeleteTransaction deleteTransactionUsecase;
 
   TransactionController({
     required this.createTransactionUsecase,
+    required this.updateTransactionUsecase,
     required this.togglePaidStatusUsecase,
     required this.deleteTransactionUsecase,
   });
@@ -67,6 +70,64 @@ class TransactionController {
     await createTransactionUsecase(transaction);
   }
 
+  Future<void> updateTransaction({
+    required String id,
+    required String userId,
+    required String categoryId,
+    required String type,
+    required String description,
+    required double amount,
+    required DateTime? dueDate,
+    required DateTime? receivedDate,
+    required String status,
+    required DateTime? paidAt,
+    required DateTime createdAt,
+    required bool isInstallment,
+    required String? installmentGroupId,
+    required int? installmentNumber,
+    required int? installmentTotal,
+    required double? installmentFullAmount,
+  }) async {
+    final trimmedDescription = description.trim();
+
+    if (trimmedDescription.isEmpty) {
+      throw Exception('Descrição é obrigatória');
+    }
+
+    if (amount <= 0) {
+      throw Exception('Valor deve ser maior que zero');
+    }
+
+    if (type == 'expense' && dueDate == null) {
+      throw Exception('Data de vencimento é obrigatória');
+    }
+
+    if (type == 'income' && receivedDate == null) {
+      throw Exception('Data de recebimento é obrigatória');
+    }
+
+    final transaction = FinanceTransaction(
+      id: id,
+      userId: userId,
+      categoryId: categoryId,
+      type: type,
+      description: trimmedDescription,
+      amount: amount,
+      dueDate: dueDate,
+      receivedDate: receivedDate,
+      status: status,
+      paidAt: paidAt,
+      createdAt: createdAt,
+      isInstallment: isInstallment,
+      installmentGroupId: installmentGroupId,
+      installmentNumber: installmentNumber,
+      installmentTotal: installmentTotal,
+      installmentFullAmount: installmentFullAmount,
+    );
+
+    await updateTransactionUsecase(transaction);
+  }
+
   Future<void> createExpenseInstallments({
     required String userId,
     required String categoryId,
@@ -95,9 +156,8 @@ class TransactionController {
     final remainder = cents % installmentCount;
 
     for (int i = 0; i < installmentCount; i++) {
-      final installmentCents = i == installmentCount - 1
-          ? baseInstallment + remainder
-          : baseInstallment;
+      final installmentCents =
+          i == installmentCount - 1 ? baseInstallment + remainder : baseInstallment;
 
       final installmentAmount = installmentCents / 100;
       final dueDate = _addMonths(firstDueDate, i);
@@ -141,26 +201,20 @@ class TransactionController {
     await deleteTransactionUsecase(transactionId);
   }
 
-  Future<void> reuseTransactionNextMonth(FinanceTransaction transaction) async {
-    final referenceDate = transaction.type == 'expense'
-        ? transaction.dueDate
-        : transaction.receivedDate;
-
-    if (referenceDate == null) {
-      throw Exception('Transação sem data base para reaproveitar');
-    }
-
-    final nextMonthDate = _addMonths(referenceDate, 1);
-
+  Future<void> reuseTransactionNextMonth({
+    required FinanceTransaction transaction,
+    required double amount,
+    required DateTime nextDate,
+  }) async {
     final duplicated = FinanceTransaction(
       id: const Uuid().v4(),
       userId: transaction.userId,
       categoryId: transaction.categoryId,
       type: transaction.type,
       description: transaction.description,
-      amount: transaction.amount,
-      dueDate: transaction.type == 'expense' ? nextMonthDate : null,
-      receivedDate: transaction.type == 'income' ? nextMonthDate : null,
+      amount: amount,
+      dueDate: transaction.type == 'expense' ? nextDate : null,
+      receivedDate: transaction.type == 'income' ? nextDate : null,
       status: 'pending',
       paidAt: null,
       createdAt: DateTime.now(),
@@ -174,6 +228,18 @@ class TransactionController {
     await createTransactionUsecase(duplicated);
   }
 
+  DateTime suggestedNextMonthDate(FinanceTransaction transaction) {
+    final referenceDate = transaction.type == 'expense'
+        ? transaction.dueDate
+        : transaction.receivedDate;
+
+    if (referenceDate == null) {
+      throw Exception('Transação sem data base para reaproveitar');
+    }
+
+    return _addMonths(referenceDate, 1);
+  }
+
   DateTime _addMonths(DateTime date, int monthsToAdd) {
     int year = date.year;
     int month = date.month + monthsToAdd;
@@ -184,8 +250,7 @@ class TransactionController {
     }
 
     final lastDayOfTargetMonth = DateTime(year, month + 1, 0).day;
-    final safeDay =
-        date.day > lastDayOfTargetMonth ? lastDayOfTargetMonth : date.day;
+    final safeDay = date.day > lastDayOfTargetMonth ? lastDayOfTargetMonth : date.day;
 
     return DateTime(year, month, safeDay);
   }
