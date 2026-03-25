@@ -12,21 +12,20 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 3,
+      version: 5,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
         await _createTransactionsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await _createCategoriesTable(db);
-        }
+        // Nesta fase do projeto, é mais seguro recriar transactions
+        // do que tentar manter múltiplas migrações parciais.
+        await db.execute('DROP TABLE IF EXISTS transactions');
+        await _createTransactionsTable(db);
 
-        if (oldVersion < 3) {
-          await db.execute('DROP TABLE IF EXISTS transactions');
-          await _createTransactionsTable(db);
-        }
+        await _createUsersTable(db);
+        await _createCategoriesTable(db);
       },
     );
 
@@ -71,7 +70,12 @@ class AppDatabase {
         received_date TEXT,
         status TEXT NOT NULL,
         paid_at TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        is_installment INTEGER NOT NULL DEFAULT 0,
+        installment_group_id TEXT,
+        installment_number INTEGER,
+        installment_total INTEGER,
+        installment_full_amount REAL
       )
     ''');
   }

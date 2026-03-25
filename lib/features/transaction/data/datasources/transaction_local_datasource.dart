@@ -15,14 +15,22 @@ class TransactionLocalDatasource {
     await db.insert('transactions', transaction.toMap());
   }
 
-  Future<List<FinanceTransactionModel>> getTransactionsByUser(String userId) async {
+  Future<List<FinanceTransactionModel>> getTransactionsByUser(
+    String userId,
+  ) async {
     final db = await _db;
 
     final result = await db.query(
       'transactions',
       where: 'user_id = ?',
       whereArgs: [userId],
-      orderBy: 'created_at DESC',
+      orderBy: '''
+        CASE
+          WHEN due_date IS NOT NULL THEN due_date
+          ELSE received_date
+        END DESC,
+        created_at DESC
+      ''',
     );
 
     return result.map(FinanceTransactionModel.fromMap).toList();

@@ -57,9 +57,72 @@ class TransactionController {
       status: status,
       paidAt: paidAt,
       createdAt: DateTime.now(),
+      isInstallment: false,
+      installmentGroupId: null,
+      installmentNumber: null,
+      installmentTotal: null,
+      installmentFullAmount: null,
     );
 
     await createTransactionUsecase(transaction);
+  }
+
+  Future<void> createExpenseInstallments({
+    required String userId,
+    required String categoryId,
+    required String description,
+    required double totalAmount,
+    required int installmentCount,
+    required DateTime firstDueDate,
+  }) async {
+    final trimmedDescription = description.trim();
+
+    if (trimmedDescription.isEmpty) {
+      throw Exception('Descrição é obrigatória');
+    }
+
+    if (totalAmount <= 0) {
+      throw Exception('Valor total deve ser maior que zero');
+    }
+
+    if (installmentCount < 2) {
+      throw Exception('Quantidade de parcelas deve ser pelo menos 2');
+    }
+
+    final groupId = const Uuid().v4();
+    final cents = (totalAmount * 100).round();
+    final baseInstallment = cents ~/ installmentCount;
+    final remainder = cents % installmentCount;
+
+    for (int i = 0; i < installmentCount; i++) {
+      final installmentCents = i == installmentCount - 1
+          ? baseInstallment + remainder
+          : baseInstallment;
+
+      final installmentAmount = installmentCents / 100;
+      final dueDate = _addMonths(firstDueDate, i);
+
+      final transaction = FinanceTransaction(
+        id: const Uuid().v4(),
+        userId: userId,
+        categoryId: categoryId,
+        type: 'expense',
+        description: '$trimmedDescription (${i + 1}/$installmentCount)',
+        amount: installmentAmount,
+        dueDate: dueDate,
+        receivedDate: null,
+        status: 'pending',
+        paidAt: null,
+        createdAt: DateTime.now(),
+        isInstallment: true,
+        installmentGroupId: groupId,
+        installmentNumber: i + 1,
+        installmentTotal: installmentCount,
+        installmentFullAmount: totalAmount,
+      );
+
+      await createTransactionUsecase(transaction);
+    }
   }
 
   Future<void> updateStatus({
@@ -87,7 +150,7 @@ class TransactionController {
       throw Exception('Transação sem data base para reaproveitar');
     }
 
-    final nextMonthDate = _addOneMonth(referenceDate);
+    final nextMonthDate = _addMonths(referenceDate, 1);
 
     final duplicated = FinanceTransaction(
       id: const Uuid().v4(),
@@ -101,21 +164,29 @@ class TransactionController {
       status: 'pending',
       paidAt: null,
       createdAt: DateTime.now(),
+      isInstallment: false,
+      installmentGroupId: null,
+      installmentNumber: null,
+      installmentTotal: null,
+      installmentFullAmount: null,
     );
 
     await createTransactionUsecase(duplicated);
   }
 
-  DateTime _addOneMonth(DateTime date) {
-    final nextMonth = date.month == 12 ? 1 : date.month + 1;
-    final nextYear = date.month == 12 ? date.year + 1 : date.year;
+  DateTime _addMonths(DateTime date, int monthsToAdd) {
+    int year = date.year;
+    int month = date.month + monthsToAdd;
 
-    final monthAfterNext = nextMonth == 12 ? 1 : nextMonth + 1;
-    final yearOfMonthAfterNext = nextMonth == 12 ? nextYear + 1 : nextYear;
+    while (month > 12) {
+      month -= 12;
+      year++;
+    }
 
-    final lastDay = DateTime(yearOfMonthAfterNext, monthAfterNext, 0).day;
-    final safeDay = date.day > lastDay ? lastDay : date.day;
+    final lastDayOfTargetMonth = DateTime(year, month + 1, 0).day;
+    final safeDay =
+        date.day > lastDayOfTargetMonth ? lastDayOfTargetMonth : date.day;
 
-    return DateTime(nextYear, nextMonth, safeDay);
+    return DateTime(year, month, safeDay);
   }
 }

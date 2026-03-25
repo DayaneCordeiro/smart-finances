@@ -24,7 +24,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
   }
 
   void _refreshDashboard(String userId) {
-    ref.invalidate(monthlyTransactionsProvider(userId));
+    ref.invalidate(filteredTransactionsByMonthProvider(userId));
     ref.invalidate(monthlySummaryProvider(userId));
     ref.invalidate(dashboardActiveUserSummaryProvider);
   }

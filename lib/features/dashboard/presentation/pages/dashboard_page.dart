@@ -16,6 +16,7 @@ class DashboardPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeUserAsync = ref.watch(activeUserProvider);
     final summaryAsync = ref.watch(dashboardActiveUserSummaryProvider);
+    final selectedMonth = ref.watch(selectedMonthProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -70,9 +71,14 @@ class DashboardPage extends ConsumerWidget {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
+                            _MonthSelector(
+                              selectedMonth: selectedMonth,
+                            ),
+                            const SizedBox(height: 20),
                             _MonthHighlightCard(
                               balance: summary?.balance ?? 0,
+                              selectedMonth: selectedMonth,
                             ),
                             const SizedBox(height: 20),
                             MonthMoodCard(
@@ -109,6 +115,65 @@ class DashboardPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _MonthSelector extends ConsumerWidget {
+  final DateTime selectedMonth;
+
+  const _MonthSelector({
+    required this.selectedMonth,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () {
+                ref.read(selectedMonthProvider.notifier).previousMonth();
+              },
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Expanded(
+              child: Text(
+                _monthLabel(selectedMonth),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            IconButton(
+              onPressed: () {
+                ref.read(selectedMonthProvider.notifier).nextMonth();
+              },
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _monthLabel(DateTime date) {
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+
+    return '${months[date.month - 1]} ${date.year}';
   }
 }
 
@@ -259,15 +324,15 @@ class _SidebarItem extends StatelessWidget {
 
 class _MonthHighlightCard extends StatelessWidget {
   final double balance;
+  final DateTime selectedMonth;
 
   const _MonthHighlightCard({
     required this.balance,
+    required this.selectedMonth,
   });
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -300,7 +365,7 @@ class _MonthHighlightCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                _monthLabel(now),
+                _monthLabel(selectedMonth),
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -594,7 +659,7 @@ class _FinancialOverviewCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Valores realizados e pendentes do mês atual.',
+              'Valores realizados e pendentes do mês selecionado.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white70,
                   ),

@@ -11,6 +11,12 @@ class FinanceTransaction {
   final DateTime? paidAt;
   final DateTime createdAt;
 
+  final bool isInstallment;
+  final String? installmentGroupId;
+  final int? installmentNumber;
+  final int? installmentTotal;
+  final double? installmentFullAmount;
+
   const FinanceTransaction({
     required this.id,
     required this.userId,
@@ -23,5 +29,10 @@ class FinanceTransaction {
     required this.status,
     required this.paidAt,
     required this.createdAt,
+    required this.isInstallment,
+    required this.installmentGroupId,
+    required this.installmentNumber,
+    required this.installmentTotal,
+    required this.installmentFullAmount,
   });
 }

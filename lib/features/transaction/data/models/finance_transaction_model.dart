@@ -12,6 +12,11 @@ class FinanceTransactionModel {
   final String status;
   final DateTime? paidAt;
   final DateTime createdAt;
+  final bool isInstallment;
+  final String? installmentGroupId;
+  final int? installmentNumber;
+  final int? installmentTotal;
+  final double? installmentFullAmount;
 
   const FinanceTransactionModel({
     required this.id,
@@ -25,6 +30,11 @@ class FinanceTransactionModel {
     required this.status,
     required this.paidAt,
     required this.createdAt,
+    required this.isInstallment,
+    required this.installmentGroupId,
+    required this.installmentNumber,
+    required this.installmentTotal,
+    required this.installmentFullAmount,
   });
 
   factory FinanceTransactionModel.fromEntity(FinanceTransaction entity) {
@@ -40,6 +50,11 @@ class FinanceTransactionModel {
       status: entity.status,
       paidAt: entity.paidAt,
       createdAt: entity.createdAt,
+      isInstallment: entity.isInstallment,
+      installmentGroupId: entity.installmentGroupId,
+      installmentNumber: entity.installmentNumber,
+      installmentTotal: entity.installmentTotal,
+      installmentFullAmount: entity.installmentFullAmount,
     );
   }
 
@@ -56,6 +71,11 @@ class FinanceTransactionModel {
       status: status,
       paidAt: paidAt,
       createdAt: createdAt,
+      isInstallment: isInstallment,
+      installmentGroupId: installmentGroupId,
+      installmentNumber: installmentNumber,
+      installmentTotal: installmentTotal,
+      installmentFullAmount: installmentFullAmount,
     );
   }
 
@@ -72,6 +92,11 @@ class FinanceTransactionModel {
       'status': status,
       'paid_at': paidAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
+      'is_installment': isInstallment ? 1 : 0,
+      'installment_group_id': installmentGroupId,
+      'installment_number': installmentNumber,
+      'installment_total': installmentTotal,
+      'installment_full_amount': installmentFullAmount,
     };
   }
 
@@ -94,6 +119,13 @@ class FinanceTransactionModel {
           ? DateTime.parse(map['paid_at'] as String)
           : null,
       createdAt: DateTime.parse(map['created_at'] as String),
+      isInstallment: ((map['is_installment'] ?? 0) as int) == 1,
+      installmentGroupId: map['installment_group_id'] as String?,
+      installmentNumber: map['installment_number'] as int?,
+      installmentTotal: map['installment_total'] as int?,
+      installmentFullAmount: map['installment_full_amount'] != null
+          ? (map['installment_full_amount'] as num).toDouble()
+          : null,
     );
   }
 }
