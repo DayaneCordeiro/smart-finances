@@ -9,5 +9,12 @@ abstract class TransactionRepository {
     required String status,
     required DateTime? paidAt,
   });
+  Future<void> payCreditCardBill({
+    required String userId,
+    required String creditCardId,
+    required int year,
+    required int month,
+    required DateTime paidAt,
+  });
   Future<void> deleteTransaction(String transactionId);
 }

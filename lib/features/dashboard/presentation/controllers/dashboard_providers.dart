@@ -1,35 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../credit_card/domain/entities/credit_card_entity.dart';
+import '../../../credit_card/presentation/controllers/credit_card_providers.dart';
 import '../../../transaction/domain/entities/finance_transaction.dart';
 import '../../../transaction/presentation/controllers/transaction_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../../domain/entities/monthly_summary.dart';
 import '../../domain/usecases/get_monthly_summary.dart';
 
-class SelectedMonthNotifier extends Notifier<DateTime> {
-  @override
-  DateTime build() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month);
-  }
-
-  void previousMonth() {
-    state = DateTime(state.year, state.month - 1);
-  }
-
-  void nextMonth() {
-    state = DateTime(state.year, state.month + 1);
-  }
-
-  void setMonth(DateTime value) {
-    state = DateTime(value.year, value.month);
-  }
-}
-
-final selectedMonthProvider =
-    NotifierProvider<SelectedMonthNotifier, DateTime>(
-  SelectedMonthNotifier.new,
-);
+final selectedMonthProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month);
+});
 
 final getMonthlySummaryProvider = Provider<GetMonthlySummary>((ref) {
   return GetMonthlySummary();
@@ -68,3 +50,71 @@ final dashboardActiveUserSummaryProvider =
 
   return ref.watch(monthlySummaryProvider(activeUser.id).future);
 });
+
+final creditCardStatementsProvider =
+    FutureProvider.family<List<CreditCardStatementView>, String>(
+  (ref, userId) async {
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final cards = await ref.watch(creditCardsProvider(userId).future);
+    final transactions =
+        await ref.watch(filteredTransactionsByMonthProvider(userId).future);
+
+    final result = <CreditCardStatementView>[];
+
+    for (final card in cards) {
+      final cardTransactions = transactions.where((transaction) {
+        return transaction.type == 'expense' &&
+            transaction.creditCardId == card.id;
+      }).toList();
+
+      if (cardTransactions.isEmpty) {
+        continue;
+      }
+
+      final totalAmount = cardTransactions.fold<double>(
+        0,
+        (sum, item) => sum + item.amount,
+      );
+
+      final allPaid =
+          cardTransactions.every((transaction) => transaction.status == 'paid');
+
+      final paidAtDates = cardTransactions
+          .where((transaction) => transaction.paidAt != null)
+          .map((transaction) => transaction.paidAt!)
+          .toList()
+        ..sort();
+
+      result.add(
+        CreditCardStatementView(
+          card: card,
+          totalAmount: totalAmount,
+          itemsCount: cardTransactions.length,
+          referenceMonth: selectedMonth,
+          isPaid: allPaid,
+          paidAt: allPaid && paidAtDates.isNotEmpty ? paidAtDates.last : null,
+        ),
+      );
+    }
+
+    return result;
+  },
+);
+
+class CreditCardStatementView {
+  final CreditCardEntity card;
+  final double totalAmount;
+  final int itemsCount;
+  final DateTime referenceMonth;
+  final bool isPaid;
+  final DateTime? paidAt;
+
+  const CreditCardStatementView({
+    required this.card,
+    required this.totalAmount,
+    required this.itemsCount,
+    required this.referenceMonth,
+    required this.isPaid,
+    required this.paidAt,
+  });
+}

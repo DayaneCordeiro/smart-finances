@@ -45,4 +45,21 @@ class TransactionRepositoryImpl implements TransactionRepository {
       paidAt: paidAt,
     );
   }
+
+  @override
+  Future<void> payCreditCardBill({
+    required String userId,
+    required String creditCardId,
+    required int year,
+    required int month,
+    required DateTime paidAt,
+  }) async {
+    await localDatasource.payCreditCardBill(
+      userId: userId,
+      creditCardId: creditCardId,
+      year: year,
+      month: month,
+      paidAt: paidAt,
+    );
+  }
 }

@@ -14,10 +14,14 @@ class ReuseTransactionNextMonth {
         : transaction.receivedDate;
 
     if (referenceDate == null) {
-      throw Exception('Transação sem data base para reaproveitar');
+      throw Exception('Transação sem data base');
     }
 
-    final nextMonthDate = _addMonths(referenceDate, 1);
+    final nextMonthDate = DateTime(
+      referenceDate.year,
+      referenceDate.month + 1,
+      referenceDate.day,
+    );
 
     final duplicated = FinanceTransaction(
       id: const Uuid().v4(),
@@ -31,31 +35,16 @@ class ReuseTransactionNextMonth {
       status: 'pending',
       paidAt: null,
       createdAt: DateTime.now(),
-
-      // 🔥 NOVOS CAMPOS (isso resolve o erro)
       isInstallment: false,
       installmentGroupId: null,
       installmentNumber: null,
       installmentTotal: null,
       installmentFullAmount: null,
+
+      // 🔥 CORREÇÃO
+      creditCardId: transaction.creditCardId,
     );
 
     await repository.createTransaction(duplicated);
-  }
-
-  DateTime _addMonths(DateTime date, int monthsToAdd) {
-    int year = date.year;
-    int month = date.month + monthsToAdd;
-
-    while (month > 12) {
-      month -= 12;
-      year++;
-    }
-
-    final lastDayOfTargetMonth = DateTime(year, month + 1, 0).day;
-    final safeDay =
-        date.day > lastDayOfTargetMonth ? lastDayOfTargetMonth : date.day;
-
-    return DateTime(year, month, safeDay);
   }
 }

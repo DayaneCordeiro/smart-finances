@@ -17,6 +17,7 @@ class FinanceTransactionModel {
   final int? installmentNumber;
   final int? installmentTotal;
   final double? installmentFullAmount;
+  final String? creditCardId;
 
   const FinanceTransactionModel({
     required this.id,
@@ -35,6 +36,7 @@ class FinanceTransactionModel {
     required this.installmentNumber,
     required this.installmentTotal,
     required this.installmentFullAmount,
+    required this.creditCardId,
   });
 
   factory FinanceTransactionModel.fromEntity(FinanceTransaction entity) {
@@ -55,6 +57,7 @@ class FinanceTransactionModel {
       installmentNumber: entity.installmentNumber,
       installmentTotal: entity.installmentTotal,
       installmentFullAmount: entity.installmentFullAmount,
+      creditCardId: entity.creditCardId,
     );
   }
 
@@ -76,6 +79,7 @@ class FinanceTransactionModel {
       installmentNumber: installmentNumber,
       installmentTotal: installmentTotal,
       installmentFullAmount: installmentFullAmount,
+      creditCardId: creditCardId,
     );
   }
 
@@ -97,6 +101,7 @@ class FinanceTransactionModel {
       'installment_number': installmentNumber,
       'installment_total': installmentTotal,
       'installment_full_amount': installmentFullAmount,
+      'credit_card_id': creditCardId,
     };
   }
 
@@ -126,6 +131,7 @@ class FinanceTransactionModel {
       installmentFullAmount: map['installment_full_amount'] != null
           ? (map['installment_full_amount'] as num).toDouble()
           : null,
+      creditCardId: map['credit_card_id'] as String?,
     );
   }
 }

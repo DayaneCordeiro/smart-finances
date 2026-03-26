@@ -2,12 +2,12 @@ class FinanceTransaction {
   final String id;
   final String userId;
   final String categoryId;
-  final String type; // income | expense
+  final String type;
   final String description;
   final double amount;
   final DateTime? dueDate;
   final DateTime? receivedDate;
-  final String status; // pending | paid | received | overdue
+  final String status;
   final DateTime? paidAt;
   final DateTime createdAt;
 
@@ -16,6 +16,7 @@ class FinanceTransaction {
   final int? installmentNumber;
   final int? installmentTotal;
   final double? installmentFullAmount;
+  final String? creditCardId;
 
   const FinanceTransaction({
     required this.id,
@@ -34,5 +35,6 @@ class FinanceTransaction {
     required this.installmentNumber,
     required this.installmentTotal,
     required this.installmentFullAmount,
+    required this.creditCardId,
   });
 }

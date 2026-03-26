@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../category/presentation/pages/category_page.dart';
+import '../../../credit_card/presentation/pages/credit_cards_page.dart';
+import '../../../credit_card/presentation/widgets/credit_card_statement_card.dart';
+import '../../../transaction/presentation/controllers/transaction_providers.dart';
 import '../../../transaction/presentation/pages/transaction_page.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../../../user/presentation/pages/user_list_page.dart';
@@ -29,6 +32,15 @@ class DashboardPage extends ConsumerWidget {
                 data: (activeUser) {
                   return summaryAsync.when(
                     data: (summary) {
+                      if (activeUser == null) {
+                        return const Center(
+                          child: Text('Nenhum usuário ativo'),
+                        );
+                      }
+
+                      final creditCardStatementsAsync =
+                          ref.watch(creditCardStatementsProvider(activeUser.id));
+
                       return SingleChildScrollView(
                         padding: const EdgeInsets.all(24),
                         child: Column(
@@ -49,25 +61,41 @@ class DashboardPage extends ConsumerWidget {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      activeUser != null
-                                          ? 'Olá, ${activeUser.name}'
-                                          : 'Nenhum usuário ativo',
+                                      'Olá, ${activeUser.name}',
                                       style: textTheme.bodyLarge?.copyWith(
                                         color: Colors.white70,
                                       ),
                                     ),
                                   ],
                                 ),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const TransactionPage(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Nova transação'),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  children: [
+                                    FilledButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const CreditCardsPage(),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.credit_card),
+                                      label: const Text('Cartões'),
+                                    ),
+                                    FilledButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => const TransactionPage(),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Nova transação'),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -87,6 +115,55 @@ class DashboardPage extends ConsumerWidget {
                             ),
                             const SizedBox(height: 20),
                             _SummaryCardsSection(summary: summary),
+                            const SizedBox(height: 20),
+                            _CreditCardStatementsSection(
+                              asyncValue: creditCardStatementsAsync,
+                              onPayBill: (statement) async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2100),
+                                  initialDate: DateTime.now(),
+                                );
+
+                                if (picked == null) return;
+
+                                await ref
+                                    .read(transactionControllerProvider)
+                                    .payCreditCardBill(
+                                      userId: activeUser.id,
+                                      creditCardId: statement.card.id,
+                                      monthReference: statement.referenceMonth,
+                                      paidAt: picked,
+                                    );
+
+                                ref.invalidate(transactionsProvider(activeUser.id));
+                                ref.invalidate(
+                                  filteredTransactionsByMonthProvider(
+                                    activeUser.id,
+                                  ),
+                                );
+                                ref.invalidate(
+                                  monthlySummaryProvider(activeUser.id),
+                                );
+                                ref.invalidate(
+                                  dashboardActiveUserSummaryProvider,
+                                );
+                                ref.invalidate(
+                                  creditCardStatementsProvider(activeUser.id),
+                                );
+
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Fatura ${statement.card.name} marcada como paga',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
                             const SizedBox(height: 20),
                             _ChartsAndAlertsSection(summary: summary),
                             const SizedBox(height: 20),
@@ -134,7 +211,8 @@ class _MonthSelector extends ConsumerWidget {
           children: [
             IconButton(
               onPressed: () {
-                ref.read(selectedMonthProvider.notifier).previousMonth();
+                ref.read(selectedMonthProvider.notifier).state =
+                    DateTime(selectedMonth.year, selectedMonth.month - 1);
               },
               icon: const Icon(Icons.chevron_left),
             ),
@@ -147,7 +225,8 @@ class _MonthSelector extends ConsumerWidget {
             ),
             IconButton(
               onPressed: () {
-                ref.read(selectedMonthProvider.notifier).nextMonth();
+                ref.read(selectedMonthProvider.notifier).state =
+                    DateTime(selectedMonth.year, selectedMonth.month + 1);
               },
               icon: const Icon(Icons.chevron_right),
             ),
@@ -232,6 +311,15 @@ class _DashboardSidebar extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const CategoryPage()),
+              );
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.credit_card_outlined,
+            title: 'Cartões',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CreditCardsPage()),
               );
             },
           ),
@@ -560,6 +648,58 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
+class _CreditCardStatementsSection extends StatelessWidget {
+  final AsyncValue<List<CreditCardStatementView>> asyncValue;
+  final Future<void> Function(CreditCardStatementView statement) onPayBill;
+
+  const _CreditCardStatementsSection({
+    required this.asyncValue,
+    required this.onPayBill,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return asyncValue.when(
+      data: (statements) {
+        if (statements.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Faturas do cartão',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: statements.map((statement) {
+                return CreditCardStatementCard(
+                  cardName: statement.card.name,
+                  amount: statement.totalAmount,
+                  itemsCount: statement.itemsCount,
+                  isPaid: statement.isPaid,
+                  paidAt: statement.paidAt,
+                  onPayBill: statement.isPaid
+                      ? null
+                      : () => onPayBill(statement),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (error, stack) => Text(
+        'Erro ao carregar faturas: $error',
+      ),
+    );
+  }
+}
+
 class _ChartsAndAlertsSection extends StatelessWidget {
   final MonthlySummary? summary;
 
@@ -858,6 +998,17 @@ class _QuickActionsSection extends StatelessWidget {
                   },
                   icon: const Icon(Icons.category_outlined),
                   label: const Text('Categorias'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const CreditCardsPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.credit_card),
+                  label: const Text('Cartões'),
                 ),
               ],
             ),

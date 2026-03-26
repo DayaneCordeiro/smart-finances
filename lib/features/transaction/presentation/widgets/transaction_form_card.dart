@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../category/domain/entities/app_category.dart';
+import '../../../credit_card/domain/entities/credit_card_entity.dart';
 
 class TransactionFormCard extends StatelessWidget {
   final String selectedType;
@@ -8,8 +9,11 @@ class TransactionFormCard extends StatelessWidget {
   final TextEditingController amountController;
   final TextEditingController installmentCountController;
   final List<AppCategory> expenseCategories;
+  final List<CreditCardEntity> creditCards;
   final String? selectedCategoryId;
   final ValueChanged<String?> onCategoryChanged;
+  final String? selectedCreditCardId;
+  final ValueChanged<String?> onCreditCardChanged;
   final String selectedStatus;
   final ValueChanged<String?> onStatusChanged;
   final bool markAsPaid;
@@ -32,8 +36,11 @@ class TransactionFormCard extends StatelessWidget {
     required this.amountController,
     required this.installmentCountController,
     required this.expenseCategories,
+    required this.creditCards,
     required this.selectedCategoryId,
     required this.onCategoryChanged,
+    required this.selectedCreditCardId,
+    required this.onCreditCardChanged,
     required this.selectedStatus,
     required this.onStatusChanged,
     required this.markAsPaid,
@@ -121,6 +128,26 @@ class TransactionFormCard extends StatelessWidget {
                     );
                   }).toList(),
                   onChanged: onCategoryChanged,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedCreditCardId,
+                  decoration: const InputDecoration(
+                    labelText: 'Cartão de crédito (opcional)',
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Nenhum'),
+                    ),
+                    ...creditCards.map((card) {
+                      return DropdownMenuItem(
+                        value: card.id,
+                        child: Text(card.name),
+                      );
+                    }),
+                  ],
+                  onChanged: onCreditCardChanged,
                 ),
                 const SizedBox(height: 16),
                 SwitchListTile(

@@ -29,6 +29,7 @@ class TransactionController {
     required DateTime? receivedDate,
     required String status,
     required DateTime? paidAt,
+    required String? creditCardId,
   }) async {
     final trimmedDescription = description.trim();
 
@@ -65,6 +66,7 @@ class TransactionController {
       installmentNumber: null,
       installmentTotal: null,
       installmentFullAmount: null,
+      creditCardId: creditCardId,
     );
 
     await createTransactionUsecase(transaction);
@@ -87,6 +89,7 @@ class TransactionController {
     required int? installmentNumber,
     required int? installmentTotal,
     required double? installmentFullAmount,
+    required String? creditCardId,
   }) async {
     final trimmedDescription = description.trim();
 
@@ -96,14 +99,6 @@ class TransactionController {
 
     if (amount <= 0) {
       throw Exception('Valor deve ser maior que zero');
-    }
-
-    if (type == 'expense' && dueDate == null) {
-      throw Exception('Data de vencimento é obrigatória');
-    }
-
-    if (type == 'income' && receivedDate == null) {
-      throw Exception('Data de recebimento é obrigatória');
     }
 
     final transaction = FinanceTransaction(
@@ -123,6 +118,7 @@ class TransactionController {
       installmentNumber: installmentNumber,
       installmentTotal: installmentTotal,
       installmentFullAmount: installmentFullAmount,
+      creditCardId: creditCardId,
     );
 
     await updateTransactionUsecase(transaction);
@@ -135,6 +131,7 @@ class TransactionController {
     required double totalAmount,
     required int installmentCount,
     required DateTime firstDueDate,
+    required String? creditCardId,
   }) async {
     final trimmedDescription = description.trim();
 
@@ -179,6 +176,7 @@ class TransactionController {
         installmentNumber: i + 1,
         installmentTotal: installmentCount,
         installmentFullAmount: totalAmount,
+        creditCardId: creditCardId,
       );
 
       await createTransactionUsecase(transaction);
@@ -193,6 +191,21 @@ class TransactionController {
     await togglePaidStatusUsecase(
       transactionId: transactionId,
       status: status,
+      paidAt: paidAt,
+    );
+  }
+
+  Future<void> payCreditCardBill({
+    required String userId,
+    required String creditCardId,
+    required DateTime monthReference,
+    required DateTime paidAt,
+  }) async {
+    await createTransactionUsecase.repository.payCreditCardBill(
+      userId: userId,
+      creditCardId: creditCardId,
+      year: monthReference.year,
+      month: monthReference.month,
       paidAt: paidAt,
     );
   }
@@ -223,6 +236,7 @@ class TransactionController {
       installmentNumber: null,
       installmentTotal: null,
       installmentFullAmount: null,
+      creditCardId: transaction.creditCardId,
     );
 
     await createTransactionUsecase(duplicated);

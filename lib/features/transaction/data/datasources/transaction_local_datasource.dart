@@ -26,7 +26,8 @@ class TransactionLocalDatasource {
     );
   }
 
-  Future<List<FinanceTransactionModel>> getTransactionsByUser(String userId) async {
+  Future<List<FinanceTransactionModel>> getTransactionsByUser(
+      String userId) async {
     final db = await _db;
 
     final result = await db.query(
@@ -61,6 +62,41 @@ class TransactionLocalDatasource {
       where: 'id = ?',
       whereArgs: [transactionId],
     );
+  }
+
+  Future<void> payCreditCardBill({
+    required String userId,
+    required String creditCardId,
+    required int year,
+    required int month,
+    required DateTime paidAt,
+  }) async {
+    final db = await _db;
+
+    final rows = await db.query(
+      'transactions',
+      where: 'user_id = ? AND credit_card_id = ? AND type = ?',
+      whereArgs: [userId, creditCardId, 'expense'],
+    );
+
+    for (final row in rows) {
+      final dueDateString = row['due_date'] as String?;
+      if (dueDateString == null) continue;
+
+      final dueDate = DateTime.parse(dueDateString);
+
+      if (dueDate.year == year && dueDate.month == month) {
+        await db.update(
+          'transactions',
+          {
+            'status': 'paid',
+            'paid_at': paidAt.toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    }
   }
 
   Future<void> deleteTransaction(String transactionId) async {
