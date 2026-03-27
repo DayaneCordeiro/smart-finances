@@ -4,6 +4,7 @@ class FinanceTransaction {
   final String categoryId;
   final String type;
   final String description;
+  final String? storeName;
   final double amount;
   final DateTime? dueDate;
   final DateTime? receivedDate;
@@ -24,6 +25,7 @@ class FinanceTransaction {
     required this.categoryId,
     required this.type,
     required this.description,
+    required this.storeName,
     required this.amount,
     required this.dueDate,
     required this.receivedDate,

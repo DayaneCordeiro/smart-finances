@@ -11,6 +11,7 @@ import '../../../user/presentation/pages/user_list_page.dart';
 import '../../domain/entities/monthly_summary.dart';
 import '../controllers/dashboard_providers.dart';
 import '../widgets/month_mood_card.dart';
+import '../../../credit_card/presentation/pages/debts_page.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -323,9 +324,14 @@ class _DashboardSidebar extends StatelessWidget {
               );
             },
           ),
-          const _SidebarItem(
+          _SidebarItem(
             icon: Icons.receipt_long_outlined,
             title: 'Dívidas',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DebtsPage()),
+              );
+            },
           ),
           const _SidebarItem(
             icon: Icons.directions_car_outlined,

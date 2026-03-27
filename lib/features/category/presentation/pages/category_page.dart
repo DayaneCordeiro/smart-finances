@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../controllers/category_providers.dart';
 
@@ -14,7 +13,6 @@ class CategoryPage extends ConsumerStatefulWidget {
 
 class _CategoryPageState extends ConsumerState<CategoryPage> {
   final _nameController = TextEditingController();
-  String _selectedType = 'expense';
   bool _isSaving = false;
 
   @override
@@ -23,36 +21,42 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     super.dispose();
   }
 
-  void _refreshDashboard(String userId) {
-    ref.invalidate(filteredTransactionsByMonthProvider(userId));
-    ref.invalidate(monthlySummaryProvider(userId));
-    ref.invalidate(dashboardActiveUserSummaryProvider);
-  }
-
   Future<void> _saveCategory(String userId) async {
+    final name = _nameController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe o nome da categoria')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
       await ref.read(categoryControllerProvider).createCategory(
             userId: userId,
-            name: _nameController.text,
-            type: _selectedType,
+            name: name,
+            type: 'expense',
           );
 
       _nameController.clear();
       ref.invalidate(categoriesProvider(userId));
-      _refreshDashboard(userId);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Categoria criada com sucesso')),
+        const SnackBar(
+          content: Text('Categoria salva com sucesso'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao criar categoria: $e')),
+        SnackBar(
+          content: Text('Erro ao salvar categoria: $e'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -68,15 +72,16 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categorias'),
-        backgroundColor: Colors.transparent,
       ),
       body: activeUserAsync.when(
-        data: (activeUser) {
-          if (activeUser == null) {
-            return const Center(child: Text('Nenhum usuário ativo'));
+        data: (user) {
+          if (user == null) {
+            return const Center(
+              child: Text('Nenhum usuário ativo'),
+            );
           }
 
-          final categoriesAsync = ref.watch(categoriesProvider(activeUser.id));
+          final categoriesAsync = ref.watch(categoriesProvider(user.id));
 
           return Padding(
             padding: const EdgeInsets.all(24),
@@ -87,42 +92,45 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Nova categoria',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'As categorias cadastradas aqui serão usadas apenas para despesas.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Colors.white70),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         TextField(
                           controller: _nameController,
                           decoration: const InputDecoration(
                             labelText: 'Nome da categoria',
+                            hintText: 'Ex.: Internet, Mercado, Farmácia',
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        SegmentedButton<String>(
-                          segments: const [
-                            ButtonSegment(
-                              value: 'expense',
-                              label: Text('Despesa'),
-                              icon: Icon(Icons.arrow_upward),
-                            ),
-                            ButtonSegment(
-                              value: 'income',
-                              label: Text('Receita'),
-                              icon: Icon(Icons.arrow_downward),
-                            ),
-                          ],
-                          selected: {_selectedType},
-                          onSelectionChanged: (value) {
-                            setState(() => _selectedType = value.first);
-                          },
                         ),
                         const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isSaving
-                                ? null
-                                : () => _saveCategory(activeUser.id),
+                          child: FilledButton(
+                            onPressed:
+                                _isSaving ? null : () => _saveCategory(user.id),
                             child: _isSaving
                                 ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
+                                    width: 20,
+                                    height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                     ),
@@ -134,48 +142,34 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Expanded(
                   child: categoriesAsync.when(
                     data: (categories) {
-                      if (categories.isEmpty) {
+                      final expenseCategories = categories
+                          .where((category) => category.type == 'expense')
+                          .toList();
+
+                      if (expenseCategories.isEmpty) {
                         return const Center(
                           child: Text('Nenhuma categoria cadastrada'),
                         );
                       }
 
                       return ListView.separated(
-                        itemCount: categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemCount: expenseCategories.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final category = categories[index];
+                          final category = expenseCategories[index];
 
                           return Card(
                             child: ListTile(
-                              leading: CircleAvatar(
-                                child: Icon(
-                                  category.type == 'income'
-                                      ? Icons.arrow_downward
-                                      : Icons.arrow_upward,
-                                ),
+                              leading: const CircleAvatar(
+                                child: Icon(Icons.arrow_upward),
                               ),
                               title: Text(category.name),
-                              subtitle: Text(
-                                category.type == 'income'
-                                    ? 'Receita'
-                                    : 'Despesa',
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () async {
-                                  await ref
-                                      .read(categoryControllerProvider)
-                                      .deleteCategory(category.id);
-
-                                  ref.invalidate(categoriesProvider(activeUser.id));
-                                  _refreshDashboard(activeUser.id);
-                                },
-                              ),
+                              subtitle: const Text('Despesa'),
                             ),
                           );
                         },
@@ -193,9 +187,11 @@ class _CategoryPageState extends ConsumerState<CategoryPage> {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(),
+        ),
         error: (error, stack) => Center(
-          child: Text('Erro ao carregar usuário ativo: $error'),
+          child: Text('Erro ao carregar usuário: $error'),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../controllers/credit_card_providers.dart';
+import 'edit_credit_card_page.dart';
 
 class CreditCardsPage extends ConsumerStatefulWidget {
   const CreditCardsPage({super.key});
@@ -16,7 +17,7 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
   final _closingDayController = TextEditingController();
   final _dueDayController = TextEditingController();
 
-  bool _saving = false;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -27,55 +28,130 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
   }
 
   Future<void> _saveCard(String userId) async {
+    final name = _nameController.text.trim();
     final closingDay = int.tryParse(_closingDayController.text.trim());
     final dueDay = int.tryParse(_dueDayController.text.trim());
 
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe o nome do cartão')),
-      );
+    if (name.isEmpty) {
+      _showMessage('Informe o nome do cartão');
       return;
     }
 
-    if (closingDay == null || dueDay == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe dias válidos')),
-      );
+    if (closingDay == null || closingDay < 1 || closingDay > 31) {
+      _showMessage('Informe um dia de fechamento válido');
       return;
     }
 
-    setState(() => _saving = true);
+    if (dueDay == null || dueDay < 1 || dueDay > 31) {
+      _showMessage('Informe um dia de vencimento válido');
+      return;
+    }
+
+    setState(() => _isSaving = true);
 
     try {
-      await ref.read(creditCardControllerProvider).createCard(
+      await ref.read(creditCardActionsProvider).create(
             userId: userId,
-            name: _nameController.text,
+            name: name,
             closingDay: closingDay,
             dueDay: dueDay,
           );
-
-      ref.invalidate(creditCardsProvider(userId));
 
       _nameController.clear();
       _closingDayController.clear();
       _dueDayController.clear();
 
-      if (!mounted) return;
+      ref.invalidate(creditCardsProvider(userId));
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cartão cadastrado com sucesso')),
-      );
+      if (!mounted) return;
+      _showMessage('Cartão cadastrado com sucesso');
     } catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao cadastrar cartão: $e')),
-      );
+      _showMessage('Erro ao cadastrar cartão: $e');
     } finally {
       if (mounted) {
-        setState(() => _saving = false);
+        setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<void> _editCard({
+    required String userId,
+    required dynamic card,
+  }) async {
+    final result = await Navigator.of(context).push<EditCreditCardResult>(
+      MaterialPageRoute(
+        builder: (_) => EditCreditCardPage(card: card),
+      ),
+    );
+
+    if (result == null) return;
+
+    try {
+      await ref.read(creditCardActionsProvider).update(
+            card: card,
+            name: result.name,
+            closingDay: result.closingDay,
+            dueDay: result.dueDay,
+          );
+
+      ref.invalidate(creditCardsProvider(userId));
+
+      if (!mounted) return;
+      _showMessage('Cartão atualizado com sucesso');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Erro ao atualizar cartão: $e');
+    }
+  }
+
+  Future<void> _deleteCard({
+    required String userId,
+    required dynamic card,
+  }) async {
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Excluir cartão'),
+          content: Text(
+            'Tem certeza que deseja excluir o cartão ${card.name}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ref.read(creditCardActionsProvider).delete(card.id);
+
+      ref.invalidate(creditCardsProvider(userId));
+
+      if (!mounted) return;
+      _showMessage('Cartão excluído com sucesso');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -87,12 +163,14 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
         title: const Text('Cartões de crédito'),
       ),
       body: activeUserAsync.when(
-        data: (activeUser) {
-          if (activeUser == null) {
-            return const Center(child: Text('Nenhum usuário ativo'));
+        data: (user) {
+          if (user == null) {
+            return const Center(
+              child: Text('Nenhum usuário ativo'),
+            );
           }
 
-          final cardsAsync = ref.watch(creditCardsProvider(activeUser.id));
+          final cardsAsync = ref.watch(creditCardsProvider(user.id));
 
           return Padding(
             padding: const EdgeInsets.all(24),
@@ -102,13 +180,16 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Novo cartão',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Novo cartão',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         TextField(
@@ -119,35 +200,39 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
-                          controller: _closingDayController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Dia de fechamento',
-                            hintText: 'Ex.: 20',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _dueDayController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Dia de vencimento',
-                            hintText: 'Ex.: 27',
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _closingDayController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Fechamento',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextField(
+                                controller: _dueDayController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Vencimento',
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _saving
-                                ? null
-                                : () => _saveCard(activeUser.id),
-                            icon: const Icon(Icons.save_outlined),
-                            label: _saving
+                          child: FilledButton(
+                            onPressed:
+                                _isSaving ? null : () => _saveCard(user.id),
+                            child: _isSaving
                                 ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
+                                    width: 20,
+                                    height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                     ),
@@ -159,7 +244,7 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Expanded(
                   child: cardsAsync.when(
                     data: (cards) {
@@ -171,7 +256,8 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
 
                       return ListView.separated(
                         itemCount: cards.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final card = cards[index];
 
@@ -182,7 +268,28 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
                               ),
                               title: Text(card.name),
                               subtitle: Text(
-                                'Fechamento: dia ${card.closingDay} • Vencimento: dia ${card.dueDay}',
+                                'Fecha dia ${card.closingDay} • Vence dia ${card.dueDay}',
+                              ),
+                              trailing: Wrap(
+                                spacing: 8,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Editar',
+                                    onPressed: () => _editCard(
+                                      userId: user.id,
+                                      card: card,
+                                    ),
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Excluir',
+                                    onPressed: () => _deleteCard(
+                                      userId: user.id,
+                                      card: card,
+                                    ),
+                                    icon: const Icon(Icons.delete_outline),
+                                  ),
+                                ],
                               ),
                             ),
                           );
@@ -201,9 +308,11 @@ class _CreditCardsPageState extends ConsumerState<CreditCardsPage> {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(),
+        ),
         error: (error, stack) => Center(
-          child: Text('Erro ao carregar usuário ativo: $error'),
+          child: Text('Erro ao carregar usuário: $error'),
         ),
       ),
     );

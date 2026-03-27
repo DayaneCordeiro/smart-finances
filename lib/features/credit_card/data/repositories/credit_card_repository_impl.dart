@@ -4,18 +4,37 @@ import '../datasources/credit_card_local_datasource.dart';
 import '../models/credit_card_model.dart';
 
 class CreditCardRepositoryImpl implements CreditCardRepository {
-  final CreditCardLocalDatasource localDatasource;
+  final CreditCardLocalDataSource localDataSource;
 
-  CreditCardRepositoryImpl(this.localDatasource);
+  CreditCardRepositoryImpl(this.localDataSource);
 
   @override
-  Future<void> createCard(CreditCardEntity card) async {
-    await localDatasource.createCard(CreditCardModel.fromEntity(card));
+  Future<void> createCreditCard(CreditCardEntity card) async {
+    await localDataSource.createCreditCard(
+      CreditCardModel.fromEntity(card),
+    );
   }
 
   @override
-  Future<List<CreditCardEntity>> getCardsByUser(String userId) async {
-    final items = await localDatasource.getCardsByUser(userId);
-    return items.map((e) => e.toEntity()).toList();
+  Future<void> updateCreditCard(CreditCardEntity card) async {
+    await localDataSource.updateCreditCard(
+      CreditCardModel.fromEntity(card),
+    );
+  }
+
+  @override
+  Future<void> deleteCreditCard(String cardId) async {
+    await localDataSource.deleteCreditCard(cardId);
+  }
+
+  @override
+  Future<bool> hasTransactionsLinkedToCard(String cardId) {
+    return localDataSource.hasTransactionsLinkedToCard(cardId);
+  }
+
+  @override
+  Future<List<CreditCardEntity>> getCreditCardsByUser(String userId) async {
+    final cards = await localDataSource.getCreditCardsByUser(userId);
+    return cards.map((card) => card.toEntity()).toList();
   }
 }

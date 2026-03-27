@@ -9,12 +9,11 @@ class ReuseTransactionNextMonth {
   ReuseTransactionNextMonth(this.repository);
 
   Future<void> call(FinanceTransaction transaction) async {
-    final referenceDate = transaction.type == 'expense'
-        ? transaction.dueDate
-        : transaction.receivedDate;
+    final referenceDate =
+        transaction.type == 'expense' ? transaction.dueDate : transaction.receivedDate;
 
     if (referenceDate == null) {
-      throw Exception('Transação sem data base');
+      throw Exception('Transação sem data para reaproveitar');
     }
 
     final nextMonthDate = DateTime(
@@ -29,6 +28,7 @@ class ReuseTransactionNextMonth {
       categoryId: transaction.categoryId,
       type: transaction.type,
       description: transaction.description,
+      storeName: transaction.storeName,
       amount: transaction.amount,
       dueDate: transaction.type == 'expense' ? nextMonthDate : null,
       receivedDate: transaction.type == 'income' ? nextMonthDate : null,
@@ -40,8 +40,6 @@ class ReuseTransactionNextMonth {
       installmentNumber: null,
       installmentTotal: null,
       installmentFullAmount: null,
-
-      // 🔥 CORREÇÃO
       creditCardId: transaction.creditCardId,
     );
 

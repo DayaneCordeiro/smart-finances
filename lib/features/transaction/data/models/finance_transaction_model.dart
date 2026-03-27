@@ -6,6 +6,7 @@ class FinanceTransactionModel {
   final String categoryId;
   final String type;
   final String description;
+  final String? storeName;
   final double amount;
   final DateTime? dueDate;
   final DateTime? receivedDate;
@@ -25,6 +26,7 @@ class FinanceTransactionModel {
     required this.categoryId,
     required this.type,
     required this.description,
+    required this.storeName,
     required this.amount,
     required this.dueDate,
     required this.receivedDate,
@@ -46,6 +48,7 @@ class FinanceTransactionModel {
       categoryId: entity.categoryId,
       type: entity.type,
       description: entity.description,
+      storeName: entity.storeName,
       amount: entity.amount,
       dueDate: entity.dueDate,
       receivedDate: entity.receivedDate,
@@ -68,6 +71,7 @@ class FinanceTransactionModel {
       categoryId: categoryId,
       type: type,
       description: description,
+      storeName: storeName,
       amount: amount,
       dueDate: dueDate,
       receivedDate: receivedDate,
@@ -90,6 +94,7 @@ class FinanceTransactionModel {
       'category_id': categoryId,
       'type': type,
       'description': description,
+      'store_name': storeName,
       'amount': amount,
       'due_date': dueDate?.toIso8601String(),
       'received_date': receivedDate?.toIso8601String(),
@@ -112,6 +117,7 @@ class FinanceTransactionModel {
       categoryId: map['category_id'] as String,
       type: map['type'] as String,
       description: map['description'] as String,
+      storeName: map['store_name'] as String?,
       amount: (map['amount'] as num).toDouble(),
       dueDate: map['due_date'] != null
           ? DateTime.parse(map['due_date'] as String)

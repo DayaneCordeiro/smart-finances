@@ -1,23 +1,21 @@
-import 'package:sqflite/sqflite.dart';
-
 import '../../../../core/database/app_database.dart';
 import '../models/finance_transaction_model.dart';
 
-class TransactionLocalDatasource {
-  final AppDatabase appDatabase;
+class TransactionLocalDataSource {
+  final AppDatabase database;
 
-  TransactionLocalDatasource(this.appDatabase);
-
-  Future<Database> get _db async => appDatabase.database;
+  TransactionLocalDataSource(this.database);
 
   Future<void> createTransaction(FinanceTransactionModel transaction) async {
-    final db = await _db;
-    await db.insert('transactions', transaction.toMap());
+    final db = await database.database;
+    await db.insert(
+      'transactions',
+      transaction.toMap(),
+    );
   }
 
   Future<void> updateTransaction(FinanceTransactionModel transaction) async {
-    final db = await _db;
-
+    final db = await database.database;
     await db.update(
       'transactions',
       transaction.toMap(),
@@ -26,32 +24,36 @@ class TransactionLocalDatasource {
     );
   }
 
+  Future<void> deleteTransaction(String transactionId) async {
+    final db = await database.database;
+    await db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [transactionId],
+    );
+  }
+
   Future<List<FinanceTransactionModel>> getTransactionsByUser(
-      String userId) async {
-    final db = await _db;
+    String userId,
+  ) async {
+    final db = await database.database;
 
     final result = await db.query(
       'transactions',
       where: 'user_id = ?',
       whereArgs: [userId],
-      orderBy: '''
-        CASE
-          WHEN due_date IS NOT NULL THEN due_date
-          ELSE received_date
-        END DESC,
-        created_at DESC
-      ''',
+      orderBy: 'created_at DESC',
     );
 
     return result.map(FinanceTransactionModel.fromMap).toList();
   }
 
-  Future<void> updateStatus({
+  Future<void> updateTransactionStatus({
     required String transactionId,
     required String status,
     required DateTime? paidAt,
   }) async {
-    final db = await _db;
+    final db = await database.database;
 
     await db.update(
       'transactions',
@@ -71,41 +73,33 @@ class TransactionLocalDatasource {
     required int month,
     required DateTime paidAt,
   }) async {
-    final db = await _db;
+    final db = await database.database;
 
-    final rows = await db.query(
+    final start = DateTime(year, month, 1).toIso8601String();
+    final end = DateTime(year, month + 1, 1).toIso8601String();
+
+    await db.update(
       'transactions',
-      where: 'user_id = ? AND credit_card_id = ? AND type = ?',
-      whereArgs: [userId, creditCardId, 'expense'],
-    );
-
-    for (final row in rows) {
-      final dueDateString = row['due_date'] as String?;
-      if (dueDateString == null) continue;
-
-      final dueDate = DateTime.parse(dueDateString);
-
-      if (dueDate.year == year && dueDate.month == month) {
-        await db.update(
-          'transactions',
-          {
-            'status': 'paid',
-            'paid_at': paidAt.toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
-      }
-    }
-  }
-
-  Future<void> deleteTransaction(String transactionId) async {
-    final db = await _db;
-
-    await db.delete(
-      'transactions',
-      where: 'id = ?',
-      whereArgs: [transactionId],
+      {
+        'status': 'paid',
+        'paid_at': paidAt.toIso8601String(),
+      },
+      where: '''
+        user_id = ?
+        AND credit_card_id = ?
+        AND type = ?
+        AND due_date >= ?
+        AND due_date < ?
+        AND status != ?
+      ''',
+      whereArgs: [
+        userId,
+        creditCardId,
+        'expense',
+        start,
+        end,
+        'paid',
+      ],
     );
   }
 }

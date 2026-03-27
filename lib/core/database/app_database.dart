@@ -8,13 +8,11 @@ class AppDatabase {
     if (_database != null) return _database!;
 
     final dbPath = await getDatabasesPath();
-
-    // Nome novo para forçar um banco limpo nessa etapa de desenvolvimento.
     final path = join(dbPath, 'smart_finances_v2.db');
 
     _database = await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -45,6 +43,10 @@ class AppDatabase {
           await _ensureTransactionCreditCardColumn(db);
           await _createCreditCardsTable(db);
         }
+
+        if (oldVersion < 7) {
+          await _ensureTransactionStoreNameColumn(db);
+        }
       },
       onOpen: (db) async {
         await _createUsersTable(db);
@@ -54,6 +56,7 @@ class AppDatabase {
 
         await _ensureTransactionInstallmentColumns(db);
         await _ensureTransactionCreditCardColumn(db);
+        await _ensureTransactionStoreNameColumn(db);
       },
     );
 
@@ -93,6 +96,7 @@ class AppDatabase {
         category_id TEXT NOT NULL,
         type TEXT NOT NULL,
         description TEXT NOT NULL,
+        store_name TEXT,
         amount REAL NOT NULL,
         due_date TEXT,
         received_date TEXT,
@@ -124,8 +128,7 @@ class AppDatabase {
 
   Future<void> _ensureTransactionInstallmentColumns(Database db) async {
     final columns = await db.rawQuery("PRAGMA table_info(transactions)");
-    final columnNames =
-        columns.map((item) => item['name'] as String).toSet();
+    final columnNames = columns.map((item) => item['name'] as String).toSet();
 
     if (!columnNames.contains('is_installment')) {
       await db.execute(
@@ -160,12 +163,22 @@ class AppDatabase {
 
   Future<void> _ensureTransactionCreditCardColumn(Database db) async {
     final columns = await db.rawQuery("PRAGMA table_info(transactions)");
-    final columnNames =
-        columns.map((item) => item['name'] as String).toSet();
+    final columnNames = columns.map((item) => item['name'] as String).toSet();
 
     if (!columnNames.contains('credit_card_id')) {
       await db.execute(
         'ALTER TABLE transactions ADD COLUMN credit_card_id TEXT',
+      );
+    }
+  }
+
+  Future<void> _ensureTransactionStoreNameColumn(Database db) async {
+    final columns = await db.rawQuery("PRAGMA table_info(transactions)");
+    final columnNames = columns.map((item) => item['name'] as String).toSet();
+
+    if (!columnNames.contains('store_name')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN store_name TEXT',
       );
     }
   }

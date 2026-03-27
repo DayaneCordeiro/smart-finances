@@ -1,24 +1,45 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../user/presentation/controllers/user_providers.dart';
+import '../../../../core/database/app_database.dart';
 import '../../data/datasources/credit_card_local_datasource.dart';
 import '../../data/repositories/credit_card_repository_impl.dart';
 import '../../domain/entities/credit_card_entity.dart';
+import '../../domain/repositories/credit_card_repository.dart';
 import '../../domain/usecases/create_credit_card.dart';
+import '../../domain/usecases/delete_credit_card.dart';
 import '../../domain/usecases/get_credit_cards_by_user.dart';
+import '../../domain/usecases/has_transactions_for_credit_card.dart';
+import '../../domain/usecases/update_credit_card.dart';
 
-final creditCardLocalDatasourceProvider =
-    Provider<CreditCardLocalDatasource>((ref) {
-  return CreditCardLocalDatasource(ref.read(appDatabaseProvider));
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  return AppDatabase();
 });
 
-final creditCardRepositoryProvider = Provider<CreditCardRepositoryImpl>((ref) {
-  return CreditCardRepositoryImpl(ref.read(creditCardLocalDatasourceProvider));
+final creditCardLocalDataSourceProvider =
+    Provider<CreditCardLocalDataSource>((ref) {
+  return CreditCardLocalDataSource(ref.read(appDatabaseProvider));
+});
+
+final creditCardRepositoryProvider = Provider<CreditCardRepository>((ref) {
+  return CreditCardRepositoryImpl(ref.read(creditCardLocalDataSourceProvider));
 });
 
 final createCreditCardProvider = Provider<CreateCreditCard>((ref) {
   return CreateCreditCard(ref.read(creditCardRepositoryProvider));
+});
+
+final updateCreditCardProvider = Provider<UpdateCreditCard>((ref) {
+  return UpdateCreditCard(ref.read(creditCardRepositoryProvider));
+});
+
+final deleteCreditCardProvider = Provider<DeleteCreditCard>((ref) {
+  return DeleteCreditCard(ref.read(creditCardRepositoryProvider));
+});
+
+final hasTransactionsForCreditCardProvider =
+    Provider<HasTransactionsForCreditCard>((ref) {
+  return HasTransactionsForCreditCard(ref.read(creditCardRepositoryProvider));
 });
 
 final getCreditCardsByUserProvider = Provider<GetCreditCardsByUser>((ref) {
@@ -27,23 +48,34 @@ final getCreditCardsByUserProvider = Provider<GetCreditCardsByUser>((ref) {
 
 final creditCardsProvider =
     FutureProvider.family<List<CreditCardEntity>, String>((ref, userId) async {
-  return ref.read(getCreditCardsByUserProvider).call(userId);
+  final useCase = ref.read(getCreditCardsByUserProvider);
+  return useCase(userId);
 });
 
-final creditCardControllerProvider = Provider<CreditCardController>((ref) {
-  return CreditCardController(
-    createCreditCardUsecase: ref.read(createCreditCardProvider),
+final creditCardActionsProvider = Provider<CreditCardActions>((ref) {
+  return CreditCardActions(
+    createCreditCardUseCase: ref.read(createCreditCardProvider),
+    updateCreditCardUseCase: ref.read(updateCreditCardProvider),
+    deleteCreditCardUseCase: ref.read(deleteCreditCardProvider),
+    hasTransactionsForCreditCardUseCase:
+        ref.read(hasTransactionsForCreditCardProvider),
   );
 });
 
-class CreditCardController {
-  final CreateCreditCard createCreditCardUsecase;
+class CreditCardActions {
+  final CreateCreditCard createCreditCardUseCase;
+  final UpdateCreditCard updateCreditCardUseCase;
+  final DeleteCreditCard deleteCreditCardUseCase;
+  final HasTransactionsForCreditCard hasTransactionsForCreditCardUseCase;
 
-  CreditCardController({
-    required this.createCreditCardUsecase,
+  CreditCardActions({
+    required this.createCreditCardUseCase,
+    required this.updateCreditCardUseCase,
+    required this.deleteCreditCardUseCase,
+    required this.hasTransactionsForCreditCardUseCase,
   });
 
-  Future<void> createCard({
+  Future<void> create({
     required String userId,
     required String name,
     required int closingDay,
@@ -72,6 +104,51 @@ class CreditCardController {
       createdAt: DateTime.now(),
     );
 
-    await createCreditCardUsecase(card);
+    await createCreditCardUseCase(card);
+  }
+
+  Future<void> update({
+    required CreditCardEntity card,
+    required String name,
+    required int closingDay,
+    required int dueDay,
+  }) async {
+    final trimmedName = name.trim();
+
+    if (trimmedName.isEmpty) {
+      throw Exception('Nome do cartão é obrigatório');
+    }
+
+    if (closingDay < 1 || closingDay > 31) {
+      throw Exception('Dia de fechamento inválido');
+    }
+
+    if (dueDay < 1 || dueDay > 31) {
+      throw Exception('Dia de vencimento inválido');
+    }
+
+    final updated = CreditCardEntity(
+      id: card.id,
+      userId: card.userId,
+      name: trimmedName,
+      closingDay: closingDay,
+      dueDay: dueDay,
+      createdAt: card.createdAt,
+    );
+
+    await updateCreditCardUseCase(updated);
+  }
+
+  Future<void> delete(String cardId) async {
+    final hasTransactions =
+        await hasTransactionsForCreditCardUseCase(cardId);
+
+    if (hasTransactions) {
+      throw Exception(
+        'Este cartão possui compras vinculadas e não pode ser excluído.',
+      );
+    }
+
+    await deleteCreditCardUseCase(cardId);
   }
 }

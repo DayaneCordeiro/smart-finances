@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../category/presentation/controllers/category_providers.dart';
+import '../../../credit_card/presentation/controllers/credit_card_debt_provider.dart';
 import '../../../credit_card/presentation/controllers/credit_card_providers.dart';
+import '../../../credit_card/presentation/pages/create_existing_debt_page.dart';
 import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../../domain/entities/finance_transaction.dart';
@@ -19,10 +21,14 @@ class TransactionPage extends ConsumerStatefulWidget {
   ConsumerState<TransactionPage> createState() => _TransactionPageState();
 }
 
-class _TransactionPageState extends ConsumerState<TransactionPage> {
+class _TransactionPageState extends ConsumerState<TransactionPage>
+    with SingleTickerProviderStateMixin {
+  final _storeController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   final _installmentCountController = TextEditingController(text: '2');
+
+  late final TabController _tabController;
 
   String _selectedType = 'expense';
   String? _selectedCategoryId;
@@ -36,10 +42,18 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
   DateTime? _paidAtDate;
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
+  }
+
+  @override
   void dispose() {
+    _storeController.dispose();
     _descriptionController.dispose();
     _amountController.dispose();
     _installmentCountController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -49,6 +63,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
     ref.invalidate(monthlySummaryProvider(userId));
     ref.invalidate(dashboardActiveUserSummaryProvider);
     ref.invalidate(creditCardStatementsProvider(userId));
+    ref.invalidate(creditCardDebtsProvider(userId));
   }
 
   Future<void> _pickMainDate() async {
@@ -99,6 +114,22 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
       return;
     }
 
+    if (_selectedType == 'expense' && _isInstallment) {
+      if (_storeController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Informe a loja')),
+        );
+        return;
+      }
+
+      if (_selectedCreditCardId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecione um cartão de crédito')),
+        );
+        return;
+      }
+    }
+
     final parsedValue = double.tryParse(
       _amountController.text.replaceAll(',', '.'),
     );
@@ -121,6 +152,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
               categoryId: 'income_fixed',
               type: 'income',
               description: _descriptionController.text,
+              storeName: null,
               amount: parsedValue,
               dueDate: null,
               receivedDate: _mainDate,
@@ -140,10 +172,11 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
               userId: userId,
               categoryId: _selectedCategoryId!,
               description: _descriptionController.text,
+              storeName: _storeController.text,
               totalAmount: parsedValue,
               installmentCount: installmentCount,
               firstDueDate: _mainDate,
-              creditCardId: _selectedCreditCardId,
+              creditCardId: _selectedCreditCardId!,
             );
       } else {
         await ref.read(transactionControllerProvider).createTransaction(
@@ -151,6 +184,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
               categoryId: _selectedCategoryId!,
               type: 'expense',
               description: _descriptionController.text,
+              storeName: null,
               amount: parsedValue,
               dueDate: _mainDate,
               receivedDate: null,
@@ -160,6 +194,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
             );
       }
 
+      _storeController.clear();
       _descriptionController.clear();
       _amountController.clear();
 
@@ -177,6 +212,8 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
       _refreshFinancialData(userId);
 
       if (!mounted) return;
+
+      _tabController.animateTo(0);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -361,6 +398,19 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
       appBar: AppBar(
         title: const Text('Transações'),
         backgroundColor: Colors.transparent,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.list_alt_outlined),
+              text: 'Transações do mês',
+            ),
+            Tab(
+              icon: Icon(Icons.add_card_outlined),
+              text: 'Nova transação',
+            ),
+          ],
+        ),
       ),
       body: activeUserAsync.when(
         data: (activeUser) {
@@ -381,78 +431,47 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                       .where((category) => category.type == 'expense')
                       .toList();
 
-                  return Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            child: _TransactionMonthSelector(
-                              selectedMonth: selectedMonth,
-                            ),
+                  return Column(
+                    children: [
+                      Card(
+                        margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: _TransactionMonthSelector(
+                            selectedMonth: selectedMonth,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final isCompact = constraints.maxWidth < 1100;
-
-                              if (isCompact) {
-                                return Column(
-                                  children: [
-                                    Expanded(
-                                      child: _buildTransactionList(
-                                        context: context,
-                                        activeUserId: activeUser.id,
-                                        categories: categories,
-                                        transactionsAsync: transactionsAsync,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Expanded(
-                                      child: _buildTransactionForm(
-                                        activeUserId: activeUser.id,
-                                        expenseCategories: expenseCategories,
-                                        creditCards: creditCards,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }
-
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    flex: 6,
-                                    child: _buildTransactionList(
-                                      context: context,
-                                      activeUserId: activeUser.id,
-                                      categories: categories,
-                                      transactionsAsync: transactionsAsync,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    flex: 5,
-                                    child: _buildTransactionForm(
-                                      activeUserId: activeUser.id,
-                                      expenseCategories: expenseCategories,
-                                      creditCards: creditCards,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                              child: _buildTransactionList(
+                                context: context,
+                                activeUserId: activeUser.id,
+                                categories: categories,
+                                transactionsAsync: transactionsAsync,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                              child: _buildTransactionForm(
+                                context: context,
+                                activeUserId: activeUser.id,
+                                expenseCategories: expenseCategories,
+                                creditCards: creditCards,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   );
                 },
                 loading: () => const Center(
@@ -493,6 +512,13 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
               'Transações do mês',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Veja, edite, copie ou exclua lançamentos do mês selecionado.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
                   ),
             ),
             const SizedBox(height: 16),
@@ -540,6 +566,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
                                       : result.categoryId!,
                                   type: transaction.type,
                                   description: result.description,
+                                  storeName: transaction.storeName,
                                   amount: result.amount,
                                   dueDate: transaction.type == 'expense'
                                       ? result.mainDate
@@ -704,76 +731,111 @@ class _TransactionPageState extends ConsumerState<TransactionPage> {
   }
 
   Widget _buildTransactionForm({
+    required BuildContext context,
     required String activeUserId,
     required List<dynamic> expenseCategories,
     required List<dynamic> creditCards,
   }) {
     return Card(
-      child: TransactionFormCard(
-        selectedType: _selectedType,
-        descriptionController: _descriptionController,
-        amountController: _amountController,
-        installmentCountController: _installmentCountController,
-        expenseCategories: expenseCategories.cast(),
-        creditCards: creditCards.cast(),
-        selectedCategoryId: _selectedCategoryId,
-        onCategoryChanged: (value) {
-          setState(() => _selectedCategoryId = value);
-        },
-        selectedCreditCardId: _selectedCreditCardId,
-        onCreditCardChanged: (value) {
-          setState(() => _selectedCreditCardId = value);
-        },
-        selectedStatus: _selectedStatus,
-        onStatusChanged: (value) {
-          if (value == null) return;
+      child: Column(
+        children: [
+          Expanded(
+            child: TransactionFormCard(
+              selectedType: _selectedType,
+              storeController: _storeController,
+              descriptionController: _descriptionController,
+              amountController: _amountController,
+              installmentCountController: _installmentCountController,
+              expenseCategories: expenseCategories.cast(),
+              creditCards: creditCards.cast(),
+              selectedCategoryId: _selectedCategoryId,
+              onCategoryChanged: (value) {
+                setState(() => _selectedCategoryId = value);
+              },
+              selectedCreditCardId: _selectedCreditCardId,
+              onCreditCardChanged: (value) {
+                setState(() => _selectedCreditCardId = value);
+              },
+              selectedStatus: _selectedStatus,
+              onStatusChanged: (value) {
+                if (value == null) return;
 
-          setState(() {
-            _selectedStatus = value;
-            _markAsPaid = value == 'paid';
+                setState(() {
+                  _selectedStatus = value;
+                  _markAsPaid = value == 'paid';
 
-            if (_markAsPaid) {
-              _paidAtDate ??= DateTime.now();
-            } else {
-              _paidAtDate = null;
-            }
-          });
-        },
-        markAsPaid: _markAsPaid,
-        onMarkAsPaidChanged: _syncStatusWithSwitch,
-        isInstallment: _isInstallment,
-        onInstallmentChanged: (value) {
-          setState(() {
-            _isInstallment = value;
+                  if (_markAsPaid) {
+                    _paidAtDate ??= DateTime.now();
+                  } else {
+                    _paidAtDate = null;
+                  }
+                });
+              },
+              markAsPaid: _markAsPaid,
+              onMarkAsPaidChanged: _syncStatusWithSwitch,
+              isInstallment: _isInstallment,
+              onInstallmentChanged: (value) {
+                setState(() {
+                  _isInstallment = value;
 
-            if (value) {
-              _selectedStatus = 'pending';
-              _markAsPaid = false;
-              _paidAtDate = null;
-            }
-          });
-        },
-        mainDate: _mainDate,
-        onPickMainDate: _pickMainDate,
-        paidAtDate: _paidAtDate,
-        onPickPaidAtDate: _pickPaidAtDate,
-        onClearPaidAt: () {
-          setState(() => _paidAtDate = null);
-        },
-        isSaving: _isSaving,
-        onSave: () => _saveTransaction(activeUserId),
-        onTypeChanged: (value) {
-          setState(() {
-            _selectedType = value.first;
-            _selectedCategoryId = null;
-            _selectedCreditCardId = null;
-            _selectedStatus = 'pending';
-            _markAsPaid = false;
-            _paidAtDate = null;
-            _isInstallment = false;
-            _mainDate = DateTime.now();
-          });
-        },
+                  if (value) {
+                    _selectedStatus = 'pending';
+                    _markAsPaid = false;
+                    _paidAtDate = null;
+                  } else {
+                    _storeController.clear();
+                  }
+                });
+              },
+              mainDate: _mainDate,
+              onPickMainDate: _pickMainDate,
+              paidAtDate: _paidAtDate,
+              onPickPaidAtDate: _pickPaidAtDate,
+              onClearPaidAt: () {
+                setState(() => _paidAtDate = null);
+              },
+              isSaving: _isSaving,
+              onSave: () => _saveTransaction(activeUserId),
+              onTypeChanged: (value) {
+                setState(() {
+                  _selectedType = value.first;
+                  _selectedCategoryId = null;
+                  _selectedCreditCardId = null;
+                  _selectedStatus = 'pending';
+                  _markAsPaid = false;
+                  _paidAtDate = null;
+                  _isInstallment = false;
+                  _mainDate = DateTime.now();
+                  _storeController.clear();
+                });
+              },
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CreateExistingDebtPage(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('Cadastrar dívida em andamento'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

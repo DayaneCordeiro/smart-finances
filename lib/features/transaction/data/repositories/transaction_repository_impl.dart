@@ -4,33 +4,33 @@ import '../datasources/transaction_local_datasource.dart';
 import '../models/finance_transaction_model.dart';
 
 class TransactionRepositoryImpl implements TransactionRepository {
-  final TransactionLocalDatasource localDatasource;
+  final TransactionLocalDataSource localDataSource;
 
-  TransactionRepositoryImpl(this.localDatasource);
+  TransactionRepositoryImpl(this.localDataSource);
 
   @override
   Future<void> createTransaction(FinanceTransaction transaction) async {
-    await localDatasource.createTransaction(
+    await localDataSource.createTransaction(
       FinanceTransactionModel.fromEntity(transaction),
     );
   }
 
   @override
   Future<void> updateTransaction(FinanceTransaction transaction) async {
-    await localDatasource.updateTransaction(
+    await localDataSource.updateTransaction(
       FinanceTransactionModel.fromEntity(transaction),
     );
   }
 
   @override
   Future<void> deleteTransaction(String transactionId) async {
-    await localDatasource.deleteTransaction(transactionId);
+    await localDataSource.deleteTransaction(transactionId);
   }
 
   @override
   Future<List<FinanceTransaction>> getTransactionsByUser(String userId) async {
-    final transactions = await localDatasource.getTransactionsByUser(userId);
-    return transactions.map((e) => e.toEntity()).toList();
+    final models = await localDataSource.getTransactionsByUser(userId);
+    return models.map((model) => model.toEntity()).toList();
   }
 
   @override
@@ -39,7 +39,7 @@ class TransactionRepositoryImpl implements TransactionRepository {
     required String status,
     required DateTime? paidAt,
   }) async {
-    await localDatasource.updateStatus(
+    await localDataSource.updateTransactionStatus(
       transactionId: transactionId,
       status: status,
       paidAt: paidAt,
@@ -54,7 +54,7 @@ class TransactionRepositoryImpl implements TransactionRepository {
     required int month,
     required DateTime paidAt,
   }) async {
-    await localDatasource.payCreditCardBill(
+    await localDataSource.payCreditCardBill(
       userId: userId,
       creditCardId: creditCardId,
       year: year,

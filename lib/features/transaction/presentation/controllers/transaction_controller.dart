@@ -24,6 +24,7 @@ class TransactionController {
     required String categoryId,
     required String type,
     required String description,
+    String? storeName,
     required double amount,
     required DateTime? dueDate,
     required DateTime? receivedDate,
@@ -32,22 +33,7 @@ class TransactionController {
     required String? creditCardId,
   }) async {
     final trimmedDescription = description.trim();
-
-    if (trimmedDescription.isEmpty) {
-      throw Exception('Descrição é obrigatória');
-    }
-
-    if (amount <= 0) {
-      throw Exception('Valor deve ser maior que zero');
-    }
-
-    if (type == 'expense' && dueDate == null) {
-      throw Exception('Data de vencimento é obrigatória');
-    }
-
-    if (type == 'income' && receivedDate == null) {
-      throw Exception('Data de recebimento é obrigatória');
-    }
+    final trimmedStoreName = storeName?.trim();
 
     final transaction = FinanceTransaction(
       id: const Uuid().v4(),
@@ -55,6 +41,7 @@ class TransactionController {
       categoryId: categoryId,
       type: type,
       description: trimmedDescription,
+      storeName: trimmedStoreName?.isEmpty == true ? null : trimmedStoreName,
       amount: amount,
       dueDate: dueDate,
       receivedDate: receivedDate,
@@ -72,80 +59,18 @@ class TransactionController {
     await createTransactionUsecase(transaction);
   }
 
-  Future<void> updateTransaction({
-    required String id,
-    required String userId,
-    required String categoryId,
-    required String type,
-    required String description,
-    required double amount,
-    required DateTime? dueDate,
-    required DateTime? receivedDate,
-    required String status,
-    required DateTime? paidAt,
-    required DateTime createdAt,
-    required bool isInstallment,
-    required String? installmentGroupId,
-    required int? installmentNumber,
-    required int? installmentTotal,
-    required double? installmentFullAmount,
-    required String? creditCardId,
-  }) async {
-    final trimmedDescription = description.trim();
-
-    if (trimmedDescription.isEmpty) {
-      throw Exception('Descrição é obrigatória');
-    }
-
-    if (amount <= 0) {
-      throw Exception('Valor deve ser maior que zero');
-    }
-
-    final transaction = FinanceTransaction(
-      id: id,
-      userId: userId,
-      categoryId: categoryId,
-      type: type,
-      description: trimmedDescription,
-      amount: amount,
-      dueDate: dueDate,
-      receivedDate: receivedDate,
-      status: status,
-      paidAt: paidAt,
-      createdAt: createdAt,
-      isInstallment: isInstallment,
-      installmentGroupId: installmentGroupId,
-      installmentNumber: installmentNumber,
-      installmentTotal: installmentTotal,
-      installmentFullAmount: installmentFullAmount,
-      creditCardId: creditCardId,
-    );
-
-    await updateTransactionUsecase(transaction);
-  }
-
   Future<void> createExpenseInstallments({
     required String userId,
     required String categoryId,
     required String description,
+    required String storeName,
     required double totalAmount,
     required int installmentCount,
     required DateTime firstDueDate,
-    required String? creditCardId,
+    required String creditCardId,
   }) async {
+    final trimmedStoreName = storeName.trim();
     final trimmedDescription = description.trim();
-
-    if (trimmedDescription.isEmpty) {
-      throw Exception('Descrição é obrigatória');
-    }
-
-    if (totalAmount <= 0) {
-      throw Exception('Valor total deve ser maior que zero');
-    }
-
-    if (installmentCount < 2) {
-      throw Exception('Quantidade de parcelas deve ser pelo menos 2');
-    }
 
     final groupId = const Uuid().v4();
     final cents = (totalAmount * 100).round();
@@ -164,7 +89,8 @@ class TransactionController {
         userId: userId,
         categoryId: categoryId,
         type: 'expense',
-        description: '$trimmedDescription (${i + 1}/$installmentCount)',
+        description: trimmedDescription,
+        storeName: trimmedStoreName,
         amount: installmentAmount,
         dueDate: dueDate,
         receivedDate: null,
@@ -183,6 +109,96 @@ class TransactionController {
     }
   }
 
+  Future<void> createExistingDebt({
+    required String userId,
+    required String categoryId,
+    required String storeName,
+    required String description,
+    required double totalAmount,
+    required double installmentAmount,
+    required int totalInstallments,
+    required int paidInstallments,
+    required DateTime nextInstallmentDate,
+    required String creditCardId,
+  }) async {
+    final trimmedStoreName = storeName.trim();
+    final trimmedDescription = description.trim();
+
+    final groupId = const Uuid().v4();
+
+    for (int i = paidInstallments; i < totalInstallments; i++) {
+      final remainingIndex = i - paidInstallments;
+      final dueDate = _addMonths(nextInstallmentDate, remainingIndex);
+
+      final transaction = FinanceTransaction(
+        id: const Uuid().v4(),
+        userId: userId,
+        categoryId: categoryId,
+        type: 'expense',
+        description: trimmedDescription,
+        storeName: trimmedStoreName,
+        amount: installmentAmount,
+        dueDate: dueDate,
+        receivedDate: null,
+        status: 'pending',
+        paidAt: null,
+        createdAt: DateTime.now(),
+        isInstallment: true,
+        installmentGroupId: groupId,
+        installmentNumber: i + 1,
+        installmentTotal: totalInstallments,
+        installmentFullAmount: totalAmount,
+        creditCardId: creditCardId,
+      );
+
+      await createTransactionUsecase(transaction);
+    }
+  }
+
+  Future<void> updateTransaction({
+    required String id,
+    required String userId,
+    required String categoryId,
+    required String type,
+    required String description,
+    String? storeName,
+    required double amount,
+    required DateTime? dueDate,
+    required DateTime? receivedDate,
+    required String status,
+    required DateTime? paidAt,
+    required DateTime createdAt,
+    required bool isInstallment,
+    required String? installmentGroupId,
+    required int? installmentNumber,
+    required int? installmentTotal,
+    required double? installmentFullAmount,
+    required String? creditCardId,
+  }) async {
+    final transaction = FinanceTransaction(
+      id: id,
+      userId: userId,
+      categoryId: categoryId,
+      type: type,
+      description: description.trim(),
+      storeName: storeName?.trim().isEmpty == true ? null : storeName?.trim(),
+      amount: amount,
+      dueDate: dueDate,
+      receivedDate: receivedDate,
+      status: status,
+      paidAt: paidAt,
+      createdAt: createdAt,
+      isInstallment: isInstallment,
+      installmentGroupId: installmentGroupId,
+      installmentNumber: installmentNumber,
+      installmentTotal: installmentTotal,
+      installmentFullAmount: installmentFullAmount,
+      creditCardId: creditCardId,
+    );
+
+    await updateTransactionUsecase(transaction);
+  }
+
   Future<void> updateStatus({
     required String transactionId,
     required String status,
@@ -193,6 +209,10 @@ class TransactionController {
       status: status,
       paidAt: paidAt,
     );
+  }
+
+  Future<void> deleteTransaction(String transactionId) async {
+    await deleteTransactionUsecase(transactionId);
   }
 
   Future<void> payCreditCardBill({
@@ -210,10 +230,6 @@ class TransactionController {
     );
   }
 
-  Future<void> deleteTransaction(String transactionId) async {
-    await deleteTransactionUsecase(transactionId);
-  }
-
   Future<void> reuseTransactionNextMonth({
     required FinanceTransaction transaction,
     required double amount,
@@ -225,6 +241,7 @@ class TransactionController {
       categoryId: transaction.categoryId,
       type: transaction.type,
       description: transaction.description,
+      storeName: transaction.storeName,
       amount: amount,
       dueDate: transaction.type == 'expense' ? nextDate : null,
       receivedDate: transaction.type == 'income' ? nextDate : null,

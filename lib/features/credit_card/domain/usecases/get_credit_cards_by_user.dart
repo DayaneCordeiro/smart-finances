@@ -6,7 +6,7 @@ class GetCreditCardsByUser {
 
   GetCreditCardsByUser(this.repository);
 
-  Future<List<CreditCardEntity>> call(String userId) async {
-    return repository.getCardsByUser(userId);
+  Future<List<CreditCardEntity>> call(String userId) {
+    return repository.getCreditCardsByUser(userId);
   }
 }

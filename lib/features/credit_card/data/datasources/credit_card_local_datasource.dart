@@ -1,22 +1,59 @@
-import 'package:sqflite/sqflite.dart';
-
 import '../../../../core/database/app_database.dart';
 import '../models/credit_card_model.dart';
 
-class CreditCardLocalDatasource {
-  final AppDatabase appDatabase;
+class CreditCardLocalDataSource {
+  final AppDatabase database;
 
-  CreditCardLocalDatasource(this.appDatabase);
+  CreditCardLocalDataSource(this.database);
 
-  Future<Database> get _db async => appDatabase.database;
+  Future<void> createCreditCard(CreditCardModel card) async {
+    final db = await database.database;
 
-  Future<void> createCard(CreditCardModel card) async {
-    final db = await _db;
-    await db.insert('credit_cards', card.toMap());
+    await db.insert(
+      'credit_cards',
+      card.toMap(),
+    );
   }
 
-  Future<List<CreditCardModel>> getCardsByUser(String userId) async {
-    final db = await _db;
+  Future<void> updateCreditCard(CreditCardModel card) async {
+    final db = await database.database;
+
+    await db.update(
+      'credit_cards',
+      card.toMap(),
+      where: 'id = ?',
+      whereArgs: [card.id],
+    );
+  }
+
+  Future<void> deleteCreditCard(String cardId) async {
+    final db = await database.database;
+
+    await db.delete(
+      'credit_cards',
+      where: 'id = ?',
+      whereArgs: [cardId],
+    );
+  }
+
+  Future<bool> hasTransactionsLinkedToCard(String cardId) async {
+    final db = await database.database;
+
+    final result = await db.rawQuery(
+      '''
+      SELECT COUNT(*) AS total
+      FROM transactions
+      WHERE credit_card_id = ?
+      ''',
+      [cardId],
+    );
+
+    final total = (result.first['total'] as int?) ?? 0;
+    return total > 0;
+  }
+
+  Future<List<CreditCardModel>> getCreditCardsByUser(String userId) async {
+    final db = await database.database;
 
     final result = await db.query(
       'credit_cards',

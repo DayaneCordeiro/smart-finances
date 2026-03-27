@@ -5,6 +5,7 @@ import '../../../credit_card/domain/entities/credit_card_entity.dart';
 
 class TransactionFormCard extends StatelessWidget {
   final String selectedType;
+  final TextEditingController storeController;
   final TextEditingController descriptionController;
   final TextEditingController amountController;
   final TextEditingController installmentCountController;
@@ -32,6 +33,7 @@ class TransactionFormCard extends StatelessWidget {
   const TransactionFormCard({
     super.key,
     required this.selectedType,
+    required this.storeController,
     required this.descriptionController,
     required this.amountController,
     required this.installmentCountController,
@@ -60,219 +62,293 @@ class TransactionFormCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isExpense = selectedType == 'expense';
+    final showStoreField = isExpense && isInstallment;
     final title = isExpense ? 'Nova despesa' : 'Nova receita';
 
+    double? parsedTotal;
+    int? parsedInstallments;
+    double? previewInstallmentValue;
+
+    if (isExpense && isInstallment) {
+      parsedTotal = double.tryParse(amountController.text.replaceAll(',', '.'));
+      parsedInstallments = int.tryParse(installmentCountController.text.trim());
+
+      if (parsedTotal != null &&
+          parsedInstallments != null &&
+          parsedInstallments > 0) {
+        previewInstallmentValue = parsedTotal / parsedInstallments;
+      }
+    }
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'expense',
+                label: Text('Despesa'),
+                icon: Icon(Icons.arrow_upward),
               ),
-              const SizedBox(height: 16),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'expense',
-                    label: Text('Despesa'),
-                    icon: Icon(Icons.arrow_upward),
-                  ),
-                  ButtonSegment(
-                    value: 'income',
-                    label: Text('Receita'),
-                    icon: Icon(Icons.arrow_downward),
-                  ),
-                ],
-                selected: {selectedType},
-                onSelectionChanged: onTypeChanged,
+              ButtonSegment(
+                value: 'income',
+                label: Text('Receita'),
+                icon: Icon(Icons.arrow_downward),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição',
-                ),
+            ],
+            selected: {selectedType},
+            onSelectionChanged: onTypeChanged,
+          ),
+          const SizedBox(height: 16),
+          if (showStoreField) ...[
+            TextField(
+              controller: storeController,
+              decoration: const InputDecoration(
+                labelText: 'Loja',
+                hintText: 'Ex.: Magalu, Shopee, Mercado Livre',
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: isInstallment && isExpense
-                      ? 'Valor total da compra'
-                      : 'Valor',
-                ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          TextField(
+            controller: descriptionController,
+            decoration: InputDecoration(
+              labelText: 'Descrição',
+              hintText: isExpense
+                  ? 'Ex.: Internet, Tablet, Cortinas, Vestido'
+                  : 'Ex.: Salário, Freelance',
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: amountController,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            decoration: InputDecoration(
+              labelText: isInstallment && isExpense
+                  ? 'Valor total da compra'
+                  : 'Valor',
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (isExpense) ...[
+            DropdownButtonFormField<String>(
+              value: selectedCategoryId,
+              decoration: const InputDecoration(
+                labelText: 'Categoria',
               ),
-              const SizedBox(height: 16),
-              if (isExpense) ...[
-                DropdownButtonFormField<String>(
-                  value: selectedCategoryId,
-                  decoration: const InputDecoration(
-                    labelText: 'Categoria',
+              items: expenseCategories.map((category) {
+                return DropdownMenuItem(
+                  value: category.id,
+                  child: Text(category.name),
+                );
+              }).toList(),
+              onChanged: onCategoryChanged,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: selectedCreditCardId,
+              decoration: InputDecoration(
+                labelText: isInstallment
+                    ? 'Cartão de crédito'
+                    : 'Cartão de crédito (opcional)',
+              ),
+              items: [
+                if (!isInstallment)
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Nenhum'),
                   ),
-                  items: expenseCategories.map((category) {
-                    return DropdownMenuItem(
-                      value: category.id,
-                      child: Text(category.name),
-                    );
-                  }).toList(),
-                  onChanged: onCategoryChanged,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedCreditCardId,
-                  decoration: const InputDecoration(
-                    labelText: 'Cartão de crédito (opcional)',
-                  ),
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('Nenhum'),
-                    ),
-                    ...creditCards.map((card) {
-                      return DropdownMenuItem(
-                        value: card.id,
-                        child: Text(card.name),
-                      );
-                    }),
-                  ],
-                  onChanged: onCreditCardChanged,
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: isInstallment,
-                  onChanged: onInstallmentChanged,
-                  title: const Text('Compra parcelada'),
-                  subtitle: const Text(
-                    'Serão geradas despesas mensais automaticamente',
-                  ),
-                ),
-                if (isInstallment) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: installmentCountController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantidade de parcelas',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Apenas o valor da parcela entrará em cada mês.',
-                    ),
-                  ),
-                ],
+                ...creditCards.map((card) {
+                  return DropdownMenuItem(
+                    value: card.id,
+                    child: Text(card.name),
+                  );
+                }),
               ],
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  isExpense
-                      ? (isInstallment
-                          ? 'Data da primeira parcela: ${_formatDate(mainDate)}'
-                          : 'Data de vencimento: ${_formatDate(mainDate)}')
-                      : 'Data de recebimento: ${_formatDate(mainDate)}',
-                ),
-                trailing: OutlinedButton(
-                  onPressed: onPickMainDate,
-                  child: const Text('Escolher data'),
+              onChanged: onCreditCardChanged,
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: isInstallment,
+              onChanged: onInstallmentChanged,
+              title: const Text('Compra parcelada'),
+              subtitle: const Text(
+                'Serão geradas despesas mensais automaticamente',
+              ),
+            ),
+            if (isInstallment) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: installmentCountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Quantidade de parcelas',
                 ),
               ),
-              if (isExpense && !isInstallment) ...[
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'pending',
-                      child: Text('Pendente'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'paid',
-                      child: Text('Pago'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'overdue',
-                      child: Text('Atrasado'),
-                    ),
-                  ],
-                  onChanged: onStatusChanged,
-                ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: markAsPaid,
-                  onChanged: onMarkAsPaidChanged,
-                  title: const Text('Marcar como pago'),
-                  subtitle: const Text(
-                    'Você pode ajustar a data real manualmente',
-                  ),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    paidAtDate != null
-                        ? 'Data de pagamento: ${_formatDate(paidAtDate!)}'
-                        : 'Data de pagamento: não informada',
-                  ),
-                  trailing: Wrap(
-                    spacing: 8,
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      OutlinedButton(
-                        onPressed: selectedStatus == 'paid'
-                            ? onPickPaidAtDate
-                            : null,
-                        child: const Text('Escolher data'),
+                      Text(
+                        'Prévia do parcelamento',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
-                      if (paidAtDate != null)
-                        TextButton(
-                          onPressed: onClearPaidAt,
-                          child: const Text('Limpar'),
-                        ),
+                      const SizedBox(height: 10),
+                      _PreviewInfoRow(
+                        label: 'Primeira parcela',
+                        value: _formatDate(mainDate),
+                      ),
+                      const SizedBox(height: 8),
+                      _PreviewInfoRow(
+                        label: 'Última parcela',
+                        value: parsedInstallments != null &&
+                                parsedInstallments > 0
+                            ? _formatDate(_addMonths(
+                                mainDate,
+                                parsedInstallments - 1,
+                              ))
+                            : '-',
+                      ),
+                      const SizedBox(height: 8),
+                      _PreviewInfoRow(
+                        label: 'Valor da parcela',
+                        value: previewInstallmentValue != null
+                            ? 'R\$ ${previewInstallmentValue.toStringAsFixed(2).replaceAll('.', ',')}'
+                            : '-',
+                      ),
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isSaving ? null : onSave,
-                  child: isSaving
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          isInstallment ? 'Gerar parcelas' : 'Salvar transação',
-                        ),
-                ),
               ),
             ],
+          ],
+          const SizedBox(height: 16),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              isExpense
+                  ? (isInstallment
+                      ? 'Data da primeira parcela: ${_formatDate(mainDate)}'
+                      : 'Data de vencimento: ${_formatDate(mainDate)}')
+                  : 'Data de recebimento: ${_formatDate(mainDate)}',
+            ),
+            trailing: OutlinedButton(
+              onPressed: onPickMainDate,
+              child: const Text('Escolher data'),
+            ),
           ),
-        ),
+          if (isExpense && !isInstallment) ...[
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedStatus,
+              decoration: const InputDecoration(
+                labelText: 'Status',
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'pending',
+                  child: Text('Pendente'),
+                ),
+                DropdownMenuItem(
+                  value: 'paid',
+                  child: Text('Pago'),
+                ),
+                DropdownMenuItem(
+                  value: 'overdue',
+                  child: Text('Atrasado'),
+                ),
+              ],
+              onChanged: onStatusChanged,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: markAsPaid,
+              onChanged: onMarkAsPaidChanged,
+              title: const Text('Marcar como pago'),
+              subtitle: const Text(
+                'Você pode ajustar a data real manualmente',
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                paidAtDate != null
+                    ? 'Data de pagamento: ${_formatDate(paidAtDate!)}'
+                    : 'Data de pagamento: não informada',
+              ),
+              trailing: Wrap(
+                spacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed:
+                        selectedStatus == 'paid' ? onPickPaidAtDate : null,
+                    child: const Text('Escolher data'),
+                  ),
+                  if (paidAtDate != null)
+                    TextButton(
+                      onPressed: onClearPaidAt,
+                      child: const Text('Limpar'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isSaving ? null : onSave,
+              child: isSaving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(
+                      isInstallment ? 'Gerar parcelas' : 'Salvar transação',
+                    ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  DateTime _addMonths(DateTime date, int monthsToAdd) {
+    int year = date.year;
+    int month = date.month + monthsToAdd;
+
+    while (month > 12) {
+      month -= 12;
+      year++;
+    }
+
+    final lastDay = DateTime(year, month + 1, 0).day;
+    final safeDay = date.day > lastDay ? lastDay : date.day;
+
+    return DateTime(year, month, safeDay);
   }
 
   String _formatDate(DateTime date) {
@@ -280,5 +356,28 @@ class TransactionFormCard extends StatelessWidget {
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString();
     return '$day/$month/$year';
+  }
+}
+
+class _PreviewInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _PreviewInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
   }
 }
