@@ -11,7 +11,6 @@ import '../../../user/presentation/pages/user_list_page.dart';
 import '../../domain/entities/monthly_summary.dart';
 import '../controllers/dashboard_providers.dart';
 import '../widgets/month_mood_card.dart';
-import '../../../credit_card/presentation/pages/debts_page.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -62,7 +61,9 @@ class DashboardPage extends ConsumerWidget {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Olá, ${activeUser.name}',
+                                      activeUser != null
+                                          ? 'Olá, ${activeUser.name}'
+                                          : 'Nenhum usuário ativo',
                                       style: textTheme.bodyLarge?.copyWith(
                                         color: Colors.white70,
                                       ),
@@ -89,7 +90,8 @@ class DashboardPage extends ConsumerWidget {
                                       onPressed: () {
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) => const TransactionPage(),
+                                            builder: (_) =>
+                                                const TransactionPage(),
                                           ),
                                         );
                                       },
@@ -134,11 +136,11 @@ class DashboardPage extends ConsumerWidget {
                                     .payCreditCardBill(
                                       userId: activeUser.id,
                                       creditCardId: statement.card.id,
-                                      monthReference: statement.referenceMonth,
+                                      monthReference:
+                                          statement.referenceMonth,
                                       paidAt: picked,
                                     );
 
-                                ref.invalidate(transactionsProvider(activeUser.id));
                                 ref.invalidate(
                                   filteredTransactionsByMonthProvider(
                                     activeUser.id,
@@ -324,14 +326,9 @@ class _DashboardSidebar extends StatelessWidget {
               );
             },
           ),
-          _SidebarItem(
+          const _SidebarItem(
             icon: Icons.receipt_long_outlined,
             title: 'Dívidas',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DebtsPage()),
-              );
-            },
           ),
           const _SidebarItem(
             icon: Icons.directions_car_outlined,
@@ -671,31 +668,82 @@ class _CreditCardStatementsSection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Faturas do cartão',
-              style: Theme.of(context).textTheme.titleLarge,
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Faturas do cartão',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Acompanhe e quite as faturas vinculadas ao mês selecionado.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (statements.length == 1) {
+                      final statement = statements.first;
+
+                      return SizedBox(
+                        width: double.infinity,
+                        child: CreditCardStatementCard(
+                          cardName: statement.card.name,
+                          amount: statement.totalAmount,
+                          itemsCount: statement.itemsCount,
+                          isPaid: statement.isPaid,
+                          paidAt: statement.paidAt,
+                          onPayBill: statement.isPaid
+                              ? null
+                              : () => onPayBill(statement),
+                        ),
+                      );
+                    }
+
+                    final maxWidth = constraints.maxWidth;
+                    int crossAxisCount = 2;
+
+                    if (maxWidth >= 1400) {
+                      crossAxisCount = 3;
+                    } else if (maxWidth < 700) {
+                      crossAxisCount = 1;
+                    }
+
+                    final spacing = 16.0;
+                    final itemWidth =
+                        (maxWidth - (spacing * (crossAxisCount - 1))) /
+                            crossAxisCount;
+
+                    return Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: statements.map((statement) {
+                        return SizedBox(
+                          width: itemWidth,
+                          child: CreditCardStatementCard(
+                            cardName: statement.card.name,
+                            amount: statement.totalAmount,
+                            itemsCount: statement.itemsCount,
+                            isPaid: statement.isPaid,
+                            paidAt: statement.paidAt,
+                            onPayBill: statement.isPaid
+                                ? null
+                                : () => onPayBill(statement),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: statements.map((statement) {
-                return CreditCardStatementCard(
-                  cardName: statement.card.name,
-                  amount: statement.totalAmount,
-                  itemsCount: statement.itemsCount,
-                  isPaid: statement.isPaid,
-                  paidAt: statement.paidAt,
-                  onPayBill: statement.isPaid
-                      ? null
-                      : () => onPayBill(statement),
-                );
-              }).toList(),
-            ),
-          ],
+          ),
         );
       },
       loading: () => const SizedBox.shrink(),
@@ -1004,17 +1052,6 @@ class _QuickActionsSection extends StatelessWidget {
                   },
                   icon: const Icon(Icons.category_outlined),
                   label: const Text('Categorias'),
-                ),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CreditCardsPage(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.credit_card),
-                  label: const Text('Cartões'),
                 ),
               ],
             ),
