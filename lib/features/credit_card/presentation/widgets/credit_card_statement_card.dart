@@ -7,6 +7,7 @@ class CreditCardStatementCard extends StatelessWidget {
   final bool isPaid;
   final DateTime? paidAt;
   final VoidCallback? onPayBill;
+  final VoidCallback? onOpenDetails;
 
   const CreditCardStatementCard({
     super.key,
@@ -16,6 +17,7 @@ class CreditCardStatementCard extends StatelessWidget {
     required this.isPaid,
     required this.paidAt,
     required this.onPayBill,
+    required this.onOpenDetails,
   });
 
   String _formatCurrency(double value) {
@@ -36,102 +38,132 @@ class CreditCardStatementCard extends StatelessWidget {
         ? Colors.greenAccent.withOpacity(0.14)
         : Colors.blueAccent.withOpacity(0.16);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onOpenDetails,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.credit_card),
-                ),
-                SizedBox(
-                  width: 220,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cardName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$itemsCount lançamento(s) vinculado(s)',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white70,
-                            ),
+                      child: const Icon(Icons.credit_card),
+                    ),
+                    SizedBox(
+                      width: 220,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cardName,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$itemsCount lançamento(s) vinculado(s)',
+                            style:
+                                Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Colors.white70,
+                                    ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: badgeColor.withOpacity(0.22),
+                        ),
+                      ),
+                      child: Text(
+                        isPaid ? 'Paga' : 'Em aberto',
+                        style: TextStyle(
+                          color: badgeColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                const SizedBox(height: 18),
+                Text(
+                  'Fatura do mês',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _formatCurrency(amount),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                if (isPaid && paidAt != null) ...[
+                  Text(
+                    'Paga em ${_formatDate(paidAt!)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
                   ),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: badgeColor.withOpacity(0.22),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onOpenDetails,
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: const Text('Ver compras'),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    isPaid ? 'Paga' : 'Em aberto',
-                    style: TextStyle(
-                      color: badgeColor,
-                      fontWeight: FontWeight.w700,
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: isPaid ? null : onPayBill,
+                        icon: Icon(
+                          isPaid ? Icons.check_circle_outline : Icons.payment,
+                        ),
+                        label: Text(
+                          isPaid ? 'Fatura já paga' : 'Pagar fatura',
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Fatura do mês',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _formatCurrency(amount),
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            if (isPaid && paidAt != null) ...[
-              Text(
-                'Paga em ${_formatDate(paidAt!)}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white70,
-                    ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: isPaid ? null : onPayBill,
-                icon: Icon(isPaid ? Icons.check_circle_outline : Icons.payment),
-                label: Text(isPaid ? 'Fatura já paga' : 'Pagar fatura'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

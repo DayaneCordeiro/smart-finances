@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../category/presentation/pages/category_page.dart';
+import '../../../credit_card/presentation/pages/credit_card_statement_details_page.dart';
 import '../../../credit_card/presentation/pages/credit_cards_page.dart';
 import '../../../credit_card/presentation/widgets/credit_card_statement_card.dart';
 import '../../../transaction/presentation/controllers/transaction_providers.dart';
@@ -165,6 +166,19 @@ class DashboardPage extends ConsumerWidget {
                                     ),
                                   );
                                 }
+                              },
+                              onOpenDetails: (statement) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        CreditCardStatementDetailsPage(
+                                      userId: activeUser.id,
+                                      creditCardId: statement.card.id,
+                                      creditCardName: statement.card.name,
+                                      initialMonth: statement.referenceMonth,
+                                    ),
+                                  ),
+                                );
                               },
                             ),
                             const SizedBox(height: 20),
@@ -654,10 +668,12 @@ class _SummaryCard extends StatelessWidget {
 class _CreditCardStatementsSection extends StatelessWidget {
   final AsyncValue<List<CreditCardStatementView>> asyncValue;
   final Future<void> Function(CreditCardStatementView statement) onPayBill;
+  final void Function(CreditCardStatementView statement) onOpenDetails;
 
   const _CreditCardStatementsSection({
     required this.asyncValue,
     required this.onPayBill,
+    required this.onOpenDetails,
   });
 
   @override
@@ -702,6 +718,7 @@ class _CreditCardStatementsSection extends StatelessWidget {
                           onPayBill: statement.isPaid
                               ? null
                               : () => onPayBill(statement),
+                          onOpenDetails: () => onOpenDetails(statement),
                         ),
                       );
                     }
@@ -735,6 +752,7 @@ class _CreditCardStatementsSection extends StatelessWidget {
                             onPayBill: statement.isPaid
                                 ? null
                                 : () => onPayBill(statement),
+                            onOpenDetails: () => onOpenDetails(statement),
                           ),
                         );
                       }).toList(),
