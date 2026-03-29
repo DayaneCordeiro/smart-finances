@@ -19,6 +19,11 @@ class FinanceTransaction {
   final double? installmentFullAmount;
   final String? creditCardId;
 
+  final String? financingId;
+  final String? financingInstallmentId;
+  final double? paidAmount;
+  final double discountAmount;
+
   const FinanceTransaction({
     required this.id,
     required this.userId,
@@ -38,5 +43,12 @@ class FinanceTransaction {
     required this.installmentTotal,
     required this.installmentFullAmount,
     required this.creditCardId,
+    required this.financingId,
+    required this.financingInstallmentId,
+    required this.paidAmount,
+    required this.discountAmount,
   });
+
+  bool get isFinancingInstallment =>
+      financingId != null && financingInstallmentId != null;
 }

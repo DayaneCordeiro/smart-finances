@@ -54,6 +54,53 @@ class TransactionController {
       installmentTotal: null,
       installmentFullAmount: null,
       creditCardId: creditCardId,
+      financingId: null,
+      financingInstallmentId: null,
+      paidAmount: null,
+      discountAmount: 0,
+    );
+
+    await createTransactionUsecase(transaction);
+  }
+
+  Future<void> createTransactionFromFinancingInstallment({
+    required String userId,
+    required String description,
+    required String storeName,
+    required double amount,
+    required DateTime dueDate,
+    required int installmentNumber,
+    required int installmentTotal,
+    required String financingId,
+    required String financingInstallmentId,
+    String initialStatus = 'pending',
+    DateTime? initialPaidAt,
+    double? initialPaidAmount,
+    double initialDiscountAmount = 0,
+  }) async {
+    final transaction = FinanceTransaction(
+      id: const Uuid().v4(),
+      userId: userId,
+      categoryId: 'financing_expense',
+      type: 'expense',
+      description: description.trim(),
+      storeName: storeName.trim().isEmpty ? null : storeName.trim(),
+      amount: amount,
+      dueDate: dueDate,
+      receivedDate: null,
+      status: initialStatus,
+      paidAt: initialPaidAt,
+      createdAt: DateTime.now(),
+      isInstallment: true,
+      installmentGroupId: financingId,
+      installmentNumber: installmentNumber,
+      installmentTotal: installmentTotal,
+      installmentFullAmount: null,
+      creditCardId: null,
+      financingId: financingId,
+      financingInstallmentId: financingInstallmentId,
+      paidAmount: initialPaidAmount,
+      discountAmount: initialDiscountAmount,
     );
 
     await createTransactionUsecase(transaction);
@@ -103,6 +150,10 @@ class TransactionController {
         installmentTotal: installmentCount,
         installmentFullAmount: totalAmount,
         creditCardId: creditCardId,
+        financingId: null,
+        financingInstallmentId: null,
+        paidAmount: null,
+        discountAmount: 0,
       );
 
       await createTransactionUsecase(transaction);
@@ -149,6 +200,10 @@ class TransactionController {
         installmentTotal: totalInstallments,
         installmentFullAmount: totalAmount,
         creditCardId: creditCardId,
+        financingId: null,
+        financingInstallmentId: null,
+        paidAmount: null,
+        discountAmount: 0,
       );
 
       await createTransactionUsecase(transaction);
@@ -174,6 +229,10 @@ class TransactionController {
     required int? installmentTotal,
     required double? installmentFullAmount,
     required String? creditCardId,
+    required String? financingId,
+    required String? financingInstallmentId,
+    required double? paidAmount,
+    required double discountAmount,
   }) async {
     final transaction = FinanceTransaction(
       id: id,
@@ -194,6 +253,10 @@ class TransactionController {
       installmentTotal: installmentTotal,
       installmentFullAmount: installmentFullAmount,
       creditCardId: creditCardId,
+      financingId: financingId,
+      financingInstallmentId: financingInstallmentId,
+      paidAmount: paidAmount,
+      discountAmount: discountAmount,
     );
 
     await updateTransactionUsecase(transaction);
@@ -254,6 +317,10 @@ class TransactionController {
       installmentTotal: null,
       installmentFullAmount: null,
       creditCardId: transaction.creditCardId,
+      financingId: null,
+      financingInstallmentId: null,
+      paidAmount: null,
+      discountAmount: 0,
     );
 
     await createTransactionUsecase(duplicated);
@@ -281,7 +348,8 @@ class TransactionController {
     }
 
     final lastDayOfTargetMonth = DateTime(year, month + 1, 0).day;
-    final safeDay = date.day > lastDayOfTargetMonth ? lastDayOfTargetMonth : date.day;
+    final safeDay =
+        date.day > lastDayOfTargetMonth ? lastDayOfTargetMonth : date.day;
 
     return DateTime(year, month, safeDay);
   }

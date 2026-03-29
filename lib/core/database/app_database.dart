@@ -12,7 +12,7 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 8, // 👈 atualizamos aqui
+      version: 9,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -50,10 +50,13 @@ class AppDatabase {
           await _ensureTransactionStoreNameColumn(db);
         }
 
-        // ✅ NOVO BLOCO
         if (oldVersion < 8) {
           await _createFinancingsTable(db);
           await _createFinancingInstallmentsTable(db);
+        }
+
+        if (oldVersion < 9) {
+          await _ensureTransactionFinancingColumns(db);
         }
       },
       onOpen: (db) async {
@@ -61,21 +64,19 @@ class AppDatabase {
         await _createCategoriesTable(db);
         await _createTransactionsTable(db);
         await _createCreditCardsTable(db);
-
-        // ✅ NOVO
         await _createFinancingsTable(db);
         await _createFinancingInstallmentsTable(db);
 
         await _ensureTransactionInstallmentColumns(db);
         await _ensureTransactionCreditCardColumn(db);
         await _ensureTransactionStoreNameColumn(db);
+        await _ensureTransactionFinancingColumns(db);
       },
     );
 
     return _database!;
   }
 
-  // ================= USERS =================
   Future<void> _createUsersTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS users (
@@ -89,7 +90,6 @@ class AppDatabase {
     ''');
   }
 
-  // ================= CATEGORIES =================
   Future<void> _createCategoriesTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS categories (
@@ -102,7 +102,6 @@ class AppDatabase {
     ''');
   }
 
-  // ================= TRANSACTIONS =================
   Future<void> _createTransactionsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS transactions (
@@ -123,12 +122,15 @@ class AppDatabase {
         installment_number INTEGER,
         installment_total INTEGER,
         installment_full_amount REAL,
-        credit_card_id TEXT
+        credit_card_id TEXT,
+        financing_id TEXT,
+        financing_installment_id TEXT,
+        paid_amount REAL,
+        discount_amount REAL NOT NULL DEFAULT 0
       )
     ''');
   }
 
-  // ================= CREDIT CARDS =================
   Future<void> _createCreditCardsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS credit_cards (
@@ -142,7 +144,6 @@ class AppDatabase {
     ''');
   }
 
-  // ================= FINANCINGS =================
   Future<void> _createFinancingsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS financings (
@@ -159,7 +160,6 @@ class AppDatabase {
     ''');
   }
 
-  // ================= FINANCING INSTALLMENTS =================
   Future<void> _createFinancingInstallmentsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS financing_installments (
@@ -176,7 +176,6 @@ class AppDatabase {
     ''');
   }
 
-  // ================= ENSURES =================
   Future<void> _ensureTransactionInstallmentColumns(Database db) async {
     final columns = await db.rawQuery("PRAGMA table_info(transactions)");
     final columnNames = columns.map((item) => item['name'] as String).toSet();
@@ -230,6 +229,35 @@ class AppDatabase {
     if (!columnNames.contains('store_name')) {
       await db.execute(
         'ALTER TABLE transactions ADD COLUMN store_name TEXT',
+      );
+    }
+  }
+
+  Future<void> _ensureTransactionFinancingColumns(Database db) async {
+    final columns = await db.rawQuery("PRAGMA table_info(transactions)");
+    final columnNames = columns.map((item) => item['name'] as String).toSet();
+
+    if (!columnNames.contains('financing_id')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN financing_id TEXT',
+      );
+    }
+
+    if (!columnNames.contains('financing_installment_id')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN financing_installment_id TEXT',
+      );
+    }
+
+    if (!columnNames.contains('paid_amount')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN paid_amount REAL',
+      );
+    }
+
+    if (!columnNames.contains('discount_amount')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0',
       );
     }
   }

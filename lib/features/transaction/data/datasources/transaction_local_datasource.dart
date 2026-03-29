@@ -8,10 +8,7 @@ class TransactionLocalDataSource {
 
   Future<void> createTransaction(FinanceTransactionModel transaction) async {
     final db = await database.database;
-    await db.insert(
-      'transactions',
-      transaction.toMap(),
-    );
+    await db.insert('transactions', transaction.toMap());
   }
 
   Future<void> updateTransaction(FinanceTransactionModel transaction) async {
@@ -37,14 +34,12 @@ class TransactionLocalDataSource {
     String userId,
   ) async {
     final db = await database.database;
-
     final result = await db.query(
       'transactions',
       where: 'user_id = ?',
       whereArgs: [userId],
       orderBy: 'created_at DESC',
     );
-
     return result.map(FinanceTransactionModel.fromMap).toList();
   }
 
@@ -54,7 +49,6 @@ class TransactionLocalDataSource {
     required DateTime? paidAt,
   }) async {
     final db = await database.database;
-
     await db.update(
       'transactions',
       {
@@ -75,31 +69,57 @@ class TransactionLocalDataSource {
   }) async {
     final db = await database.database;
 
-    final start = DateTime(year, month, 1).toIso8601String();
-    final end = DateTime(year, month + 1, 1).toIso8601String();
+    final result = await db.query(
+      'transactions',
+      where: '''
+        user_id = ? AND
+        credit_card_id = ? AND
+        type = ? AND
+        due_date IS NOT NULL
+      ''',
+      whereArgs: [userId, creditCardId, 'expense'],
+    );
+
+    for (final row in result) {
+      final dueDateRaw = row['due_date'] as String?;
+      if (dueDateRaw == null) continue;
+
+      final dueDate = DateTime.parse(dueDateRaw);
+      if (dueDate.year == year && dueDate.month == month) {
+        await db.update(
+          'transactions',
+          {
+            'status': 'paid',
+            'paid_at': paidAt.toIso8601String(),
+            'paid_amount': row['amount'],
+            'discount_amount': row['discount_amount'] ?? 0,
+          },
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    }
+  }
+
+  Future<void> updateTransactionByFinancingInstallmentId({
+    required String financingInstallmentId,
+    required String status,
+    required DateTime? paidAt,
+    required double paidAmount,
+    required double discountAmount,
+  }) async {
+    final db = await database.database;
 
     await db.update(
       'transactions',
       {
-        'status': 'paid',
-        'paid_at': paidAt.toIso8601String(),
+        'status': status,
+        'paid_at': paidAt?.toIso8601String(),
+        'paid_amount': paidAmount,
+        'discount_amount': discountAmount,
       },
-      where: '''
-        user_id = ?
-        AND credit_card_id = ?
-        AND type = ?
-        AND due_date >= ?
-        AND due_date < ?
-        AND status != ?
-      ''',
-      whereArgs: [
-        userId,
-        creditCardId,
-        'expense',
-        start,
-        end,
-        'paid',
-      ],
+      where: 'financing_installment_id = ?',
+      whereArgs: [financingInstallmentId],
     );
   }
 }

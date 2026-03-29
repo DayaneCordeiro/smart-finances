@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 import '../entities/finance_transaction.dart';
 import '../repositories/transaction_repository.dart';
 
@@ -9,11 +7,12 @@ class ReuseTransactionNextMonth {
   ReuseTransactionNextMonth(this.repository);
 
   Future<void> call(FinanceTransaction transaction) async {
-    final referenceDate =
-        transaction.type == 'expense' ? transaction.dueDate : transaction.receivedDate;
+    final referenceDate = transaction.type == 'expense'
+        ? transaction.dueDate
+        : transaction.receivedDate;
 
     if (referenceDate == null) {
-      throw Exception('Transação sem data para reaproveitar');
+      throw Exception('Transação sem data base para reaproveitar');
     }
 
     final nextMonthDate = DateTime(
@@ -23,7 +22,7 @@ class ReuseTransactionNextMonth {
     );
 
     final duplicated = FinanceTransaction(
-      id: const Uuid().v4(),
+      id: transaction.id,
       userId: transaction.userId,
       categoryId: transaction.categoryId,
       type: transaction.type,
@@ -41,6 +40,10 @@ class ReuseTransactionNextMonth {
       installmentTotal: null,
       installmentFullAmount: null,
       creditCardId: transaction.creditCardId,
+      financingId: null,
+      financingInstallmentId: null,
+      paidAmount: null,
+      discountAmount: 0,
     );
 
     await repository.createTransaction(duplicated);

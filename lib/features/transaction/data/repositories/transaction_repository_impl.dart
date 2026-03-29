@@ -4,33 +4,33 @@ import '../datasources/transaction_local_datasource.dart';
 import '../models/finance_transaction_model.dart';
 
 class TransactionRepositoryImpl implements TransactionRepository {
-  final TransactionLocalDataSource localDataSource;
+  final TransactionLocalDataSource localDatasource;
 
-  TransactionRepositoryImpl(this.localDataSource);
+  TransactionRepositoryImpl(this.localDatasource);
 
   @override
   Future<void> createTransaction(FinanceTransaction transaction) async {
-    await localDataSource.createTransaction(
+    await localDatasource.createTransaction(
       FinanceTransactionModel.fromEntity(transaction),
     );
   }
 
   @override
   Future<void> updateTransaction(FinanceTransaction transaction) async {
-    await localDataSource.updateTransaction(
+    await localDatasource.updateTransaction(
       FinanceTransactionModel.fromEntity(transaction),
     );
   }
 
   @override
   Future<void> deleteTransaction(String transactionId) async {
-    await localDataSource.deleteTransaction(transactionId);
+    await localDatasource.deleteTransaction(transactionId);
   }
 
   @override
   Future<List<FinanceTransaction>> getTransactionsByUser(String userId) async {
-    final models = await localDataSource.getTransactionsByUser(userId);
-    return models.map((model) => model.toEntity()).toList();
+    final result = await localDatasource.getTransactionsByUser(userId);
+    return result.map((e) => e.toEntity()).toList();
   }
 
   @override
@@ -38,8 +38,8 @@ class TransactionRepositoryImpl implements TransactionRepository {
     required String transactionId,
     required String status,
     required DateTime? paidAt,
-  }) async {
-    await localDataSource.updateTransactionStatus(
+  }) {
+    return localDatasource.updateTransactionStatus(
       transactionId: transactionId,
       status: status,
       paidAt: paidAt,
@@ -53,13 +53,30 @@ class TransactionRepositoryImpl implements TransactionRepository {
     required int year,
     required int month,
     required DateTime paidAt,
-  }) async {
-    await localDataSource.payCreditCardBill(
+  }) {
+    return localDatasource.payCreditCardBill(
       userId: userId,
       creditCardId: creditCardId,
       year: year,
       month: month,
       paidAt: paidAt,
+    );
+  }
+
+  @override
+  Future<void> updateTransactionByFinancingInstallmentId({
+    required String financingInstallmentId,
+    required String status,
+    required DateTime? paidAt,
+    required double paidAmount,
+    required double discountAmount,
+  }) {
+    return localDatasource.updateTransactionByFinancingInstallmentId(
+      financingInstallmentId: financingInstallmentId,
+      status: status,
+      paidAt: paidAt,
+      paidAmount: paidAmount,
+      discountAmount: discountAmount,
     );
   }
 }

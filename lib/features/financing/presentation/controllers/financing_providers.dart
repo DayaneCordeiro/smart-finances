@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../transaction/presentation/controllers/transaction_providers.dart';
 import '../../data/datasources/financing_local_datasource.dart';
 import '../../data/repositories/financing_repository_impl.dart';
 import '../../domain/entities/financing_contract.dart';
@@ -98,16 +99,19 @@ final financingSummaryProvider =
 
 final financingActionsProvider = Provider<FinancingActions>((ref) {
   return FinancingActions(
+    ref: ref,
     createFinancingUseCase: ref.read(createFinancingProvider),
     updateInstallmentUseCase: ref.read(updateFinancingInstallmentProvider),
   );
 });
 
 class FinancingActions {
+  final Ref ref;
   final CreateFinancing createFinancingUseCase;
   final UpdateFinancingInstallment updateInstallmentUseCase;
 
   FinancingActions({
+    required this.ref,
     required this.createFinancingUseCase,
     required this.updateInstallmentUseCase,
   });
@@ -146,7 +150,8 @@ class FinancingActions {
       userId: userId,
       name: trimmedName,
       assetName: trimmedAsset,
-      description: description?.trim().isEmpty == true ? null : description?.trim(),
+      description:
+          description?.trim().isEmpty == true ? null : description?.trim(),
       totalAmount: totalAmount,
       totalInstallments: totalInstallments,
       firstDueDate: firstDueDate,
@@ -173,6 +178,22 @@ class FinancingActions {
       contract: contract,
       installments: installments,
     );
+
+    for (final installment in installments) {
+      await ref
+          .read(transactionControllerProvider)
+          .createTransactionFromFinancingInstallment(
+            userId: userId,
+            description: contract.name,
+            storeName: contract.assetName,
+            amount: installment.originalAmount,
+            dueDate: installment.dueDate,
+            installmentNumber: installment.installmentNumber,
+            installmentTotal: totalInstallments,
+            financingId: contract.id,
+            financingInstallmentId: installment.id,
+          );
+    }
   }
 
   Future<void> createExistingFinancing({
@@ -215,7 +236,8 @@ class FinancingActions {
       userId: userId,
       name: trimmedName,
       assetName: trimmedAsset,
-      description: description?.trim().isEmpty == true ? null : description?.trim(),
+      description:
+          description?.trim().isEmpty == true ? null : description?.trim(),
       totalAmount: totalAmount,
       totalInstallments: totalInstallments,
       firstDueDate: firstDueDate,
@@ -245,6 +267,26 @@ class FinancingActions {
       contract: contract,
       installments: installments,
     );
+
+    for (final installment in installments) {
+      await ref
+          .read(transactionControllerProvider)
+          .createTransactionFromFinancingInstallment(
+            userId: userId,
+            description: contract.name,
+            storeName: contract.assetName,
+            amount: installment.originalAmount,
+            dueDate: installment.dueDate,
+            installmentNumber: installment.installmentNumber,
+            installmentTotal: totalInstallments,
+            financingId: contract.id,
+            financingInstallmentId: installment.id,
+            initialStatus: installment.status,
+            initialPaidAt: installment.paidAt,
+            initialPaidAmount: installment.paidAmount,
+            initialDiscountAmount: installment.discountAmount,
+          );
+    }
   }
 
   Future<void> payInstallment({
@@ -274,6 +316,16 @@ class FinancingActions {
     );
 
     await updateInstallmentUseCase(updated);
+
+    await ref
+        .read(transactionRepositoryProvider)
+        .updateTransactionByFinancingInstallmentId(
+          financingInstallmentId: installment.id,
+          status: 'paid',
+          paidAt: paidAt,
+          paidAmount: paidAmount,
+          discountAmount: discountAmount,
+        );
   }
 
   DateTime _addMonths(DateTime date, int monthsToAdd) {
@@ -286,7 +338,7 @@ class FinancingActions {
     }
 
     final lastDay = DateTime(year, month + 1, 0).day;
-    final safeDay = date.day > lastDay ? lastDay : date.day;
+    final safeDay = date.day > lastDay ? lastDay : lastDay < date.day ? lastDay : date.day;
 
     return DateTime(year, month, safeDay);
   }

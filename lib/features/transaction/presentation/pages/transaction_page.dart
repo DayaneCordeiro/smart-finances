@@ -556,37 +556,36 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
                           if (result == null) return;
 
                           try {
-                            await ref
-                                .read(transactionControllerProvider)
-                                .updateTransaction(
-                                  id: transaction.id,
-                                  userId: transaction.userId,
-                                  categoryId: transaction.type == 'income'
-                                      ? transaction.categoryId
-                                      : result.categoryId!,
-                                  type: transaction.type,
-                                  description: result.description,
-                                  storeName: transaction.storeName,
-                                  amount: result.amount,
-                                  dueDate: transaction.type == 'expense'
-                                      ? result.mainDate
-                                      : null,
-                                  receivedDate: transaction.type == 'income'
-                                      ? result.mainDate
-                                      : null,
-                                  status: result.status,
-                                  paidAt: result.paidAt,
-                                  createdAt: transaction.createdAt,
-                                  isInstallment: transaction.isInstallment,
-                                  installmentGroupId:
-                                      transaction.installmentGroupId,
-                                  installmentNumber:
-                                      transaction.installmentNumber,
-                                  installmentTotal: transaction.installmentTotal,
-                                  installmentFullAmount:
-                                      transaction.installmentFullAmount,
-                                  creditCardId: transaction.creditCardId,
-                                );
+                            await ref.read(transactionControllerProvider).updateTransaction(
+                              id: transaction.id,
+                              userId: transaction.userId,
+                              categoryId: transaction.type == 'income'
+                                  ? transaction.categoryId
+                                  : result.categoryId!,
+                              type: transaction.type,
+                              description: result.description,
+                              storeName: transaction.storeName,
+                              amount: result.amount,
+                              dueDate: transaction.type == 'expense'
+                                  ? result.mainDate
+                                  : null,
+                              receivedDate: transaction.type == 'income'
+                                  ? result.mainDate
+                                  : null,
+                              status: result.status,
+                              paidAt: result.paidAt,
+                              createdAt: transaction.createdAt,
+                              isInstallment: transaction.isInstallment,
+                              installmentGroupId: transaction.installmentGroupId,
+                              installmentNumber: transaction.installmentNumber,
+                              installmentTotal: transaction.installmentTotal,
+                              installmentFullAmount: transaction.installmentFullAmount,
+                              creditCardId: transaction.creditCardId,
+                              financingId: transaction.financingId,
+                              financingInstallmentId: transaction.financingInstallmentId,
+                              paidAmount: transaction.paidAmount,
+                              discountAmount: transaction.discountAmount,
+                            );
 
                             _refreshFinancialData(activeUserId);
 

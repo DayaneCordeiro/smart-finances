@@ -19,6 +19,10 @@ class FinanceTransactionModel {
   final int? installmentTotal;
   final double? installmentFullAmount;
   final String? creditCardId;
+  final String? financingId;
+  final String? financingInstallmentId;
+  final double? paidAmount;
+  final double discountAmount;
 
   const FinanceTransactionModel({
     required this.id,
@@ -39,6 +43,10 @@ class FinanceTransactionModel {
     required this.installmentTotal,
     required this.installmentFullAmount,
     required this.creditCardId,
+    required this.financingId,
+    required this.financingInstallmentId,
+    required this.paidAmount,
+    required this.discountAmount,
   });
 
   factory FinanceTransactionModel.fromEntity(FinanceTransaction entity) {
@@ -61,6 +69,10 @@ class FinanceTransactionModel {
       installmentTotal: entity.installmentTotal,
       installmentFullAmount: entity.installmentFullAmount,
       creditCardId: entity.creditCardId,
+      financingId: entity.financingId,
+      financingInstallmentId: entity.financingInstallmentId,
+      paidAmount: entity.paidAmount,
+      discountAmount: entity.discountAmount,
     );
   }
 
@@ -84,6 +96,10 @@ class FinanceTransactionModel {
       installmentTotal: installmentTotal,
       installmentFullAmount: installmentFullAmount,
       creditCardId: creditCardId,
+      financingId: financingId,
+      financingInstallmentId: financingInstallmentId,
+      paidAmount: paidAmount,
+      discountAmount: discountAmount,
     );
   }
 
@@ -107,6 +123,10 @@ class FinanceTransactionModel {
       'installment_total': installmentTotal,
       'installment_full_amount': installmentFullAmount,
       'credit_card_id': creditCardId,
+      'financing_id': financingId,
+      'financing_installment_id': financingInstallmentId,
+      'paid_amount': paidAmount,
+      'discount_amount': discountAmount,
     };
   }
 
@@ -138,6 +158,14 @@ class FinanceTransactionModel {
           ? (map['installment_full_amount'] as num).toDouble()
           : null,
       creditCardId: map['credit_card_id'] as String?,
+      financingId: map['financing_id'] as String?,
+      financingInstallmentId: map['financing_installment_id'] as String?,
+      paidAmount: map['paid_amount'] != null
+          ? (map['paid_amount'] as num).toDouble()
+          : null,
+      discountAmount: map['discount_amount'] != null
+          ? (map['discount_amount'] as num).toDouble()
+          : 0,
     );
   }
 }
