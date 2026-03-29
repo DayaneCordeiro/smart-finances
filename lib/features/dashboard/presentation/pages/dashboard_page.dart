@@ -12,6 +12,7 @@ import '../../../user/presentation/pages/user_list_page.dart';
 import '../../domain/entities/monthly_summary.dart';
 import '../controllers/dashboard_providers.dart';
 import '../widgets/month_mood_card.dart';
+import '../../../financing/presentation/pages/financing_page.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -344,9 +345,16 @@ class _DashboardSidebar extends StatelessWidget {
             icon: Icons.receipt_long_outlined,
             title: 'Dívidas',
           ),
-          const _SidebarItem(
+          _SidebarItem(
             icon: Icons.directions_car_outlined,
             title: 'Financiamento',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const FinancingPage(),
+                ),
+              );
+            },
           ),
           const _SidebarItem(
             icon: Icons.pie_chart_outline,

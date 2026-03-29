@@ -12,12 +12,14 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 7,
+      version: 8, // 👈 atualizamos aqui
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
         await _createTransactionsTable(db);
         await _createCreditCardsTable(db);
+        await _createFinancingsTable(db);
+        await _createFinancingInstallmentsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -47,12 +49,22 @@ class AppDatabase {
         if (oldVersion < 7) {
           await _ensureTransactionStoreNameColumn(db);
         }
+
+        // ✅ NOVO BLOCO
+        if (oldVersion < 8) {
+          await _createFinancingsTable(db);
+          await _createFinancingInstallmentsTable(db);
+        }
       },
       onOpen: (db) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
         await _createTransactionsTable(db);
         await _createCreditCardsTable(db);
+
+        // ✅ NOVO
+        await _createFinancingsTable(db);
+        await _createFinancingInstallmentsTable(db);
 
         await _ensureTransactionInstallmentColumns(db);
         await _ensureTransactionCreditCardColumn(db);
@@ -63,6 +75,7 @@ class AppDatabase {
     return _database!;
   }
 
+  // ================= USERS =================
   Future<void> _createUsersTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS users (
@@ -76,6 +89,7 @@ class AppDatabase {
     ''');
   }
 
+  // ================= CATEGORIES =================
   Future<void> _createCategoriesTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS categories (
@@ -88,6 +102,7 @@ class AppDatabase {
     ''');
   }
 
+  // ================= TRANSACTIONS =================
   Future<void> _createTransactionsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS transactions (
@@ -113,6 +128,7 @@ class AppDatabase {
     ''');
   }
 
+  // ================= CREDIT CARDS =================
   Future<void> _createCreditCardsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS credit_cards (
@@ -126,6 +142,41 @@ class AppDatabase {
     ''');
   }
 
+  // ================= FINANCINGS =================
+  Future<void> _createFinancingsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS financings (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        asset_name TEXT NOT NULL,
+        description TEXT,
+        total_amount REAL NOT NULL,
+        total_installments INTEGER NOT NULL,
+        first_due_date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // ================= FINANCING INSTALLMENTS =================
+  Future<void> _createFinancingInstallmentsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS financing_installments (
+        id TEXT PRIMARY KEY,
+        financing_id TEXT NOT NULL,
+        installment_number INTEGER NOT NULL,
+        original_amount REAL NOT NULL,
+        paid_amount REAL,
+        discount_amount REAL NOT NULL DEFAULT 0,
+        due_date TEXT NOT NULL,
+        paid_at TEXT,
+        status TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // ================= ENSURES =================
   Future<void> _ensureTransactionInstallmentColumns(Database db) async {
     final columns = await db.rawQuery("PRAGMA table_info(transactions)");
     final columnNames = columns.map((item) => item['name'] as String).toSet();
