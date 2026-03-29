@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../category/presentation/pages/category_page.dart';
 import '../../../credit_card/presentation/pages/credit_card_statement_details_page.dart';
 import '../../../credit_card/presentation/pages/credit_cards_page.dart';
 import '../../../credit_card/presentation/widgets/credit_card_statement_card.dart';
@@ -13,6 +12,7 @@ import '../../domain/entities/monthly_summary.dart';
 import '../controllers/dashboard_providers.dart';
 import '../widgets/month_mood_card.dart';
 import '../../../financing/presentation/pages/financing_page.dart';
+import '../../../credit_card/presentation/pages/debts_page.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -324,15 +324,6 @@ class _DashboardSidebar extends StatelessWidget {
             },
           ),
           _SidebarItem(
-            icon: Icons.category_outlined,
-            title: 'Categorias',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CategoryPage()),
-              );
-            },
-          ),
-          _SidebarItem(
             icon: Icons.credit_card_outlined,
             title: 'Cartões',
             onTap: () {
@@ -341,9 +332,16 @@ class _DashboardSidebar extends StatelessWidget {
               );
             },
           ),
-          const _SidebarItem(
+          _SidebarItem(
             icon: Icons.receipt_long_outlined,
             title: 'Dívidas',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const DebtsPage(),
+                ),
+              );
+            },
           ),
           _SidebarItem(
             icon: Icons.directions_car_outlined,
@@ -1067,17 +1065,6 @@ class _QuickActionsSection extends StatelessWidget {
                   },
                   icon: const Icon(Icons.remove_circle_outline),
                   label: const Text('Nova despesa'),
-                ),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CategoryPage(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.category_outlined),
-                  label: const Text('Categorias'),
                 ),
               ],
             ),

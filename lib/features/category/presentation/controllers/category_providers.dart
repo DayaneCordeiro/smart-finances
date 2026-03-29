@@ -1,41 +1,41 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../user/presentation/controllers/user_providers.dart';
-import '../../data/datasources/category_local_datasource.dart';
-import '../../data/repositories/category_repository_impl.dart';
-import '../../domain/usecases/create_category.dart';
-import '../../domain/usecases/delete_category.dart';
-import '../../domain/usecases/get_categories_by_user.dart';
-import 'category_controller.dart';
+import '../../../../core/database/app_database.dart';
+import '../../domain/entities/app_category.dart';
 
-final categoryLocalDatasourceProvider = Provider<CategoryLocalDatasource>((ref) {
-  return CategoryLocalDatasource(ref.read(appDatabaseProvider));
+final categoryDatabaseProvider = Provider<AppDatabase>((ref) {
+  return AppDatabase();
 });
 
-final categoryRepositoryProvider = Provider<CategoryRepositoryImpl>((ref) {
-  return CategoryRepositoryImpl(ref.read(categoryLocalDatasourceProvider));
-});
+final expenseCategoriesProvider =
+    FutureProvider.family<List<AppCategory>, String>((ref, userId) async {
+  final appDatabase = ref.read(categoryDatabaseProvider);
 
-final createCategoryProvider = Provider<CreateCategory>((ref) {
-  return CreateCategory(ref.read(categoryRepositoryProvider));
-});
+  await appDatabase.ensureDefaultCategoriesForUser(userId);
 
-final getCategoriesByUserProvider = Provider<GetCategoriesByUser>((ref) {
-  return GetCategoriesByUser(ref.read(categoryRepositoryProvider));
-});
-
-final deleteCategoryProvider = Provider<DeleteCategory>((ref) {
-  return DeleteCategory(ref.read(categoryRepositoryProvider));
-});
-
-final categoryControllerProvider = Provider<CategoryController>((ref) {
-  return CategoryController(
-    createCategoryUsecase: ref.read(createCategoryProvider),
-    deleteCategoryUsecase: ref.read(deleteCategoryProvider),
+  final db = await appDatabase.database;
+  final result = await db.query(
+    'categories',
+    where: 'user_id = ? AND type = ?',
+    whereArgs: [userId, 'expense'],
+    orderBy: '''
+      CASE id
+        WHEN 'fixed_expense' THEN 1
+        WHEN 'variable_expense' THEN 2
+        WHEN 'extra_expense' THEN 3
+        WHEN 'financing_expense' THEN 4
+        ELSE 99
+      END
+    ''',
   );
-});
 
-final categoriesProvider =
-    FutureProvider.family((ref, String userId) async {
-  return ref.read(getCategoriesByUserProvider).call(userId);
+  return result.map((map) {
+    return AppCategory(
+      id: map['id'] as String,
+      userId: map['user_id'] as String,
+      name: map['name'] as String,
+      type: map['type'] as String,
+      createdAt: DateTime.parse(map['created_at'] as String),
+    );
+  }).toList();
 });

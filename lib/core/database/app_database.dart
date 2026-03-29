@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../constants/default_categories.dart';
+
 class AppDatabase {
   static Database? _database;
 
@@ -12,7 +14,7 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -58,6 +60,10 @@ class AppDatabase {
         if (oldVersion < 9) {
           await _ensureTransactionFinancingColumns(db);
         }
+
+        if (oldVersion < 10) {
+          await _ensureDefaultCategoriesForAllUsers(db);
+        }
       },
       onOpen: (db) async {
         await _createUsersTable(db);
@@ -71,10 +77,17 @@ class AppDatabase {
         await _ensureTransactionCreditCardColumn(db);
         await _ensureTransactionStoreNameColumn(db);
         await _ensureTransactionFinancingColumns(db);
+
+        await _ensureDefaultCategoriesForAllUsers(db);
       },
     );
 
     return _database!;
+  }
+
+  Future<void> ensureDefaultCategoriesForUser(String userId) async {
+    final db = await database;
+    await _ensureDefaultCategoriesForUser(db, userId);
   }
 
   Future<void> _createUsersTable(Database db) async {
@@ -259,6 +272,41 @@ class AppDatabase {
       await db.execute(
         'ALTER TABLE transactions ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0',
       );
+    }
+  }
+
+  Future<void> _ensureDefaultCategoriesForAllUsers(Database db) async {
+    final users = await db.query('users', columns: ['id']);
+
+    for (final user in users) {
+      final userId = user['id'] as String?;
+      if (userId == null || userId.isEmpty) continue;
+      await _ensureDefaultCategoriesForUser(db, userId);
+    }
+  }
+
+  Future<void> _ensureDefaultCategoriesForUser(
+    Database db,
+    String userId,
+  ) async {
+    for (final category in defaultExpenseCategories) {
+      final existing = await db.query(
+        'categories',
+        columns: ['id'],
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [category.id, userId],
+        limit: 1,
+      );
+
+      if (existing.isEmpty) {
+        await db.insert('categories', {
+          'id': category.id,
+          'user_id': userId,
+          'name': category.name,
+          'type': category.type,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
     }
   }
 }

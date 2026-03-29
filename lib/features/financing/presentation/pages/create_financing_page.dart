@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
+import '../../../transaction/presentation/controllers/transaction_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../controllers/financing_providers.dart';
 
@@ -75,6 +77,11 @@ class _CreateFinancingPageState extends ConsumerState<CreateFinancingPage> {
           );
 
       ref.invalidate(financingsProvider(userId));
+
+      ref.invalidate(transactionsProvider(userId));
+      ref.invalidate(filteredTransactionsByMonthProvider(userId));
+      ref.invalidate(monthlySummaryProvider(userId));
+      ref.invalidate(dashboardActiveUserSummaryProvider);
 
       if (!mounted) return;
       _showMessage('Financiamento criado com sucesso');

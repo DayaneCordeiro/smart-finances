@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
+import '../../../transaction/presentation/controllers/transaction_providers.dart';
 import '../../../user/presentation/controllers/user_providers.dart';
 import '../controllers/financing_providers.dart';
 
@@ -53,8 +55,7 @@ class _CreateExistingFinancingPageState
         double.tryParse(_totalController.text.replaceAll(',', '.'));
     final totalInstallments =
         int.tryParse(_installmentsController.text.trim());
-    final alreadyPaid =
-        int.tryParse(_alreadyPaidController.text.trim());
+    final alreadyPaid = int.tryParse(_alreadyPaidController.text.trim());
 
     if (totalAmount == null || totalAmount <= 0) {
       _showMessage('Informe o valor total');
@@ -86,6 +87,11 @@ class _CreateExistingFinancingPageState
           );
 
       ref.invalidate(financingsProvider(userId));
+
+      ref.invalidate(transactionsProvider(userId));
+      ref.invalidate(filteredTransactionsByMonthProvider(userId));
+      ref.invalidate(monthlySummaryProvider(userId));
+      ref.invalidate(dashboardActiveUserSummaryProvider);
 
       if (!mounted) return;
       _showMessage('Financiamento em andamento cadastrado com sucesso');

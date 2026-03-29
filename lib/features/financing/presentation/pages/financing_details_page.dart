@@ -245,7 +245,6 @@ class _InstallmentCard extends ConsumerWidget {
                         await ref.read(financingActionsProvider).payInstallment(
                               installment: installment,
                               paidAmount: result.paidAmount,
-                              discountAmount: result.discountAmount,
                               paidAt: result.paidAt,
                             );
 
@@ -336,7 +335,6 @@ class _PayInstallmentDialog extends StatefulWidget {
 
 class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
   late final TextEditingController _paidAmountController;
-  final _discountController = TextEditingController();
   DateTime _paidAt = DateTime.now();
 
   @override
@@ -350,7 +348,6 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
   @override
   void dispose() {
     _paidAmountController.dispose();
-    _discountController.dispose();
     super.dispose();
   }
 
@@ -370,8 +367,6 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
   void _confirm() {
     final paidAmount =
         double.tryParse(_paidAmountController.text.replaceAll(',', '.'));
-    final discountAmount =
-        double.tryParse(_discountController.text.replaceAll(',', '.')) ?? 0;
 
     if (paidAmount == null || paidAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -380,10 +375,20 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
       return;
     }
 
+    if (paidAmount > widget.originalAmount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'O valor pago não pode ser maior que o valor da parcela',
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).pop(
       _PayInstallmentDialogResult(
         paidAmount: paidAmount,
-        discountAmount: discountAmount,
         paidAt: _paidAt,
       ),
     );
@@ -396,8 +401,20 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
     return '$d/$m/$y';
   }
 
+  String _formatCurrency(double value) {
+    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final previewDiscount = (() {
+      final paidAmount =
+          double.tryParse(_paidAmountController.text.replaceAll(',', '.'));
+      if (paidAmount == null) return 0.0;
+      final discount = widget.originalAmount - paidAmount;
+      return discount < 0 ? 0.0 : discount;
+    })();
+
     return AlertDialog(
       title: const Text('Quitar parcela'),
       content: SingleChildScrollView(
@@ -406,6 +423,10 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Text(
+                'Valor original: ${_formatCurrency(widget.originalAmount)}',
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _paidAmountController,
                 keyboardType: const TextInputType.numberWithOptions(
@@ -414,15 +435,17 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Valor realmente pago',
                 ),
+                onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _discountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Desconto obtido',
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Desconto calculado: ${_formatCurrency(previewDiscount)}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -454,12 +477,10 @@ class _PayInstallmentDialogState extends State<_PayInstallmentDialog> {
 
 class _PayInstallmentDialogResult {
   final double paidAmount;
-  final double discountAmount;
   final DateTime paidAt;
 
   const _PayInstallmentDialogResult({
     required this.paidAmount,
-    required this.discountAmount,
     required this.paidAt,
   });
 }

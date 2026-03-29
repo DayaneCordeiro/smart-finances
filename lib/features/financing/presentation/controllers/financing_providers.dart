@@ -292,16 +292,17 @@ class FinancingActions {
   Future<void> payInstallment({
     required FinancingInstallment installment,
     required double paidAmount,
-    required double discountAmount,
     required DateTime paidAt,
   }) async {
     if (paidAmount <= 0) {
       throw Exception('Informe o valor pago');
     }
 
-    if (discountAmount < 0) {
-      throw Exception('Informe um desconto válido');
+    if (paidAmount > installment.originalAmount) {
+      throw Exception('O valor pago não pode ser maior que o valor da parcela');
     }
+
+    final calculatedDiscount = installment.originalAmount - paidAmount;
 
     final updated = FinancingInstallment(
       id: installment.id,
@@ -309,7 +310,7 @@ class FinancingActions {
       installmentNumber: installment.installmentNumber,
       originalAmount: installment.originalAmount,
       paidAmount: paidAmount,
-      discountAmount: discountAmount,
+      discountAmount: calculatedDiscount,
       dueDate: installment.dueDate,
       paidAt: paidAt,
       status: 'paid',
@@ -324,7 +325,7 @@ class FinancingActions {
           status: 'paid',
           paidAt: paidAt,
           paidAmount: paidAmount,
-          discountAmount: discountAmount,
+          discountAmount: calculatedDiscount,
         );
   }
 
@@ -338,7 +339,7 @@ class FinancingActions {
     }
 
     final lastDay = DateTime(year, month + 1, 0).day;
-    final safeDay = date.day > lastDay ? lastDay : lastDay < date.day ? lastDay : date.day;
+    final safeDay = date.day > lastDay ? lastDay : date.day;
 
     return DateTime(year, month, safeDay);
   }

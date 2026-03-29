@@ -246,7 +246,7 @@ class _CreateExistingDebtPageState
             return const Center(child: Text('Nenhum usuário ativo'));
           }
 
-          final categoriesAsync = ref.watch(categoriesProvider(user.id));
+          final categoriesAsync = ref.watch(expenseCategoriesProvider(user.id));
           final cardsAsync = ref.watch(creditCardsProvider(user.id));
 
           return categoriesAsync.when(
