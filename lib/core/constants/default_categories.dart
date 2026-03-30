@@ -3,6 +3,7 @@ class DefaultCategoryIds {
   static const variableExpense = 'variable_expense';
   static const extraExpense = 'extra_expense';
   static const financingExpense = 'financing_expense';
+  static const refund = 'refund';
 }
 
 class DefaultCategoryNames {
@@ -10,6 +11,7 @@ class DefaultCategoryNames {
   static const variableExpense = 'Despesa variável';
   static const extraExpense = 'Despesa extra';
   static const financingExpense = 'Financiamento';
+  static const refund = 'Estorno';
 }
 
 class DefaultCategoryDefinition {
@@ -44,5 +46,10 @@ const defaultExpenseCategories = <DefaultCategoryDefinition>[
     id: DefaultCategoryIds.financingExpense,
     name: DefaultCategoryNames.financingExpense,
     type: 'expense',
+  ),
+  DefaultCategoryDefinition(
+    id: DefaultCategoryIds.refund,
+    name: DefaultCategoryNames.refund,
+    type: 'income',
   ),
 ];

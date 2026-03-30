@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../credit_card/presentation/controllers/credit_card_debt_provider.dart';
+import '../../../credit_card/presentation/controllers/credit_card_providers.dart';
 import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
 import '../../../financing/domain/entities/financing_installment.dart';
 import '../../../financing/presentation/controllers/financing_providers.dart';
@@ -28,6 +30,12 @@ class TransactionListCard extends ConsumerWidget {
   bool get _isExpense => transaction.type == 'expense';
 
   bool get _isFinancing => transaction.financingInstallmentId != null;
+
+  bool get _canRefundCreditCardPurchase =>
+      _isExpense &&
+      transaction.isInstallment &&
+      transaction.creditCardId != null &&
+      !_isFinancing;
 
   String _formatCurrency(double value) {
     return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
@@ -157,11 +165,66 @@ class TransactionListCard extends ConsumerWidget {
     }
   }
 
+  Future<void> _handleRefund(BuildContext context, WidgetRef ref) async {
+    final defaultRefundAmount =
+        transaction.installmentFullAmount ?? transaction.amount;
+
+    final result = await showDialog<_RefundDialogResult>(
+      context: context,
+      builder: (_) => _RefundDialog(
+        originalAmount: defaultRefundAmount,
+        description: transaction.description,
+      ),
+    );
+
+    if (result == null) return;
+
+    try {
+      await ref.read(transactionControllerProvider).createTransaction(
+            userId: transaction.userId,
+            categoryId: 'refund',
+            type: 'income',
+            description: 'Estorno - ${transaction.description}',
+            storeName: transaction.storeName,
+            amount: result.amount,
+            dueDate: null,
+            receivedDate: result.receivedAt,
+            status: 'received',
+            paidAt: result.receivedAt,
+            creditCardId: transaction.creditCardId,
+          );
+
+      ref.invalidate(transactionsProvider(transaction.userId));
+      ref.invalidate(filteredTransactionsByMonthProvider(transaction.userId));
+      ref.invalidate(monthlySummaryProvider(transaction.userId));
+      ref.invalidate(dashboardActiveUserSummaryProvider);
+      ref.invalidate(creditCardStatementsProvider(transaction.userId));
+      ref.invalidate(creditCardDebtsProvider(transaction.userId));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Estorno registrado com sucesso'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao registrar estorno: $e'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subtitleParts = <String>[];
 
-    if (transaction.storeName != null && transaction.storeName!.trim().isNotEmpty) {
+    if (transaction.storeName != null &&
+        transaction.storeName!.trim().isNotEmpty) {
       subtitleParts.add(transaction.storeName!.trim());
     }
 
@@ -207,9 +270,10 @@ class TransactionListCard extends ConsumerWidget {
                         transaction.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       if (subtitle.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -261,9 +325,10 @@ class TransactionListCard extends ConsumerWidget {
                   children: [
                     Text(
                       _formatCurrency(transaction.amount),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                     ),
                     if (_isFinancing &&
                         transaction.paidAmount != null &&
@@ -314,7 +379,7 @@ class TransactionListCard extends ConsumerWidget {
             const SizedBox(height: 14),
             LayoutBuilder(
               builder: (context, constraints) {
-                final canUseRow = constraints.maxWidth >= 520;
+                final canUseRow = constraints.maxWidth >= 640;
 
                 final buttons = <Widget>[
                   if (onEdit != null)
@@ -335,8 +400,21 @@ class TransactionListCard extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  if (onDelete != null) ...[
+                  if (_canRefundCreditCardPurchase) ...[
                     if (onEdit != null || (_isExpense && !_isPaid))
+                      const SizedBox(width: 8),
+                    Expanded(
+                      child: _CompactActionButton(
+                        icon: Icons.undo,
+                        label: 'Estornar',
+                        onPressed: () => _handleRefund(context, ref),
+                      ),
+                    ),
+                  ],
+                  if (onDelete != null) ...[
+                    if (onEdit != null ||
+                        (_isExpense && !_isPaid) ||
+                        _canRefundCreditCardPurchase)
                       const SizedBox(width: 8),
                     Expanded(
                       child: _CompactActionButton(
@@ -367,6 +445,12 @@ class TransactionListCard extends ConsumerWidget {
                         icon: Icons.check_circle_outline,
                         label: 'Pagar',
                         onPressed: () => _handlePay(context, ref),
+                      ),
+                    if (_canRefundCreditCardPurchase)
+                      _CompactActionButton(
+                        icon: Icons.undo,
+                        label: 'Estornar',
+                        onPressed: () => _handleRefund(context, ref),
                       ),
                     if (onDelete != null)
                       _CompactActionButton(
@@ -647,5 +731,159 @@ class _FinancingPayDialogResult {
   const _FinancingPayDialogResult({
     required this.paidAmount,
     required this.paidAt,
+  });
+}
+
+class _RefundDialog extends StatefulWidget {
+  final double originalAmount;
+  final String description;
+
+  const _RefundDialog({
+    required this.originalAmount,
+    required this.description,
+  });
+
+  @override
+  State<_RefundDialog> createState() => _RefundDialogState();
+}
+
+class _RefundDialogState extends State<_RefundDialog> {
+  late final TextEditingController _amountController;
+  DateTime _receivedAt = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(
+      text: widget.originalAmount.toStringAsFixed(2).replaceAll('.', ','),
+    );
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      initialDate: _receivedAt,
+    );
+
+    if (selected != null) {
+      setState(() => _receivedAt = selected);
+    }
+  }
+
+  void _confirm() {
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
+
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe um valor de estorno válido')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _RefundDialogResult(
+        amount: amount,
+        receivedAt: _receivedAt,
+      ),
+    );
+  }
+
+  String _formatCurrency(double value) {
+    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String _formatDate(DateTime date) {
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final y = date.year.toString();
+    return '$d/$m/$y';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Registrar estorno'),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Compra: ${widget.description}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Valor total da compra: ${_formatCurrency(widget.originalAmount)}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Valor do estorno',
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Data do estorno: ${_formatDate(_receivedAt)}'),
+                trailing: OutlinedButton(
+                  onPressed: _pickDate,
+                  child: const Text('Escolher data'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'As parcelas futuras continuarão normalmente.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _confirm,
+          child: const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RefundDialogResult {
+  final double amount;
+  final DateTime receivedAt;
+
+  const _RefundDialogResult({
+    required this.amount,
+    required this.receivedAt,
   });
 }

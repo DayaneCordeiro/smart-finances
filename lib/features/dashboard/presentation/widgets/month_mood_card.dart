@@ -18,15 +18,15 @@ class MonthMoodCard extends StatelessWidget {
   });
 
   MonthMood get mood {
-    if (overdueCount >= 3 || balance < -500) {
+    if (overdueCount >= 3 || balance < -100) {
       return MonthMood.sad;
     }
 
-    if (overdueCount > 0 || balance < 0) {
+    if (overdueCount > 0 || balance < 20) {
       return MonthMood.warning;
     }
 
-    if (balance >= 1000) {
+    if (balance >= 100) {
       return MonthMood.happy;
     }
 
@@ -104,6 +104,7 @@ class MonthMoodCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(22),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 130,
@@ -113,18 +114,24 @@ class MonthMoodCard extends StatelessWidget {
                 color: Colors.white.withOpacity(0.04),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Image.asset(
-                assetPath,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(
-                      Icons.pets,
-                      size: 56,
-                      color: Colors.white54,
-                    ),
-                  );
-                },
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: Image.asset(
+                  assetPath,
+                  key: ValueKey(assetPath),
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Icon(
+                        Icons.pets,
+                        size: 56,
+                        color: Colors.white54,
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(width: 18),
@@ -132,7 +139,8 @@ class MonthMoodCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
