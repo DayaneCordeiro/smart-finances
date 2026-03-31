@@ -23,4 +23,15 @@ class CreditCardAdjustmentRepositoryImpl
       creditCardId: creditCardId,
     );
   }
+
+  @override
+  Future<void> updateRemainingAmount({
+    required String adjustmentId,
+    required double remainingAmount,
+  }) {
+    return localDataSource.updateRemainingAmount(
+      adjustmentId: adjustmentId,
+      remainingAmount: remainingAmount,
+    );
+  }
 }

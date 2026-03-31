@@ -113,6 +113,7 @@ class TransactionListCard extends ConsumerWidget {
         );
         ref.invalidate(dash.monthlySummaryProvider(transaction.userId));
         ref.invalidate(dash.dashboardActiveUserSummaryProvider);
+        ref.invalidate(dash.creditCardStatementsProvider(transaction.userId));
         ref.invalidate(financingInstallmentsProvider(transaction.financingId!));
         ref.invalidate(financingSummaryProvider(transaction.financingId!));
 
@@ -154,6 +155,7 @@ class TransactionListCard extends ConsumerWidget {
       );
       ref.invalidate(dash.monthlySummaryProvider(transaction.userId));
       ref.invalidate(dash.dashboardActiveUserSummaryProvider);
+      ref.invalidate(dash.creditCardStatementsProvider(transaction.userId));
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -190,6 +192,7 @@ class TransactionListCard extends ConsumerWidget {
         creditCardId: transaction.creditCardId!,
         type: 'refund',
         amount: result.amount,
+        remainingAmount: result.amount,
         adjustmentDate: result.receivedAt,
         description: 'Estorno ${transaction.description}',
         relatedTransactionId: transaction.id,
@@ -200,6 +203,19 @@ class TransactionListCard extends ConsumerWidget {
           .read(creditCardAdjustmentRepositoryProvider)
           .createAdjustment(adjustment);
 
+      await _markCoveredTransactionsAsPaid(
+        ref,
+        refundAmount: result.amount,
+        paidAt: result.receivedAt,
+      );
+
+      ref.invalidate(tx.transactionsProvider(transaction.userId));
+      ref.invalidate(
+        dash.filteredTransactionsByMonthProvider(transaction.userId),
+      );
+      ref.invalidate(dash.monthlySummaryProvider(transaction.userId));
+      ref.invalidate(dash.dashboardActiveUserSummaryProvider);
+      ref.invalidate(dash.creditCardStatementsProvider(transaction.userId));
       ref.invalidate(
         creditCardAdjustmentsByCardProvider(
           CreditCardAdjustmentQuery(
@@ -208,7 +224,6 @@ class TransactionListCard extends ConsumerWidget {
           ),
         ),
       );
-      ref.invalidate(dash.dashboardActiveUserSummaryProvider);
       ref.invalidate(creditCardDebtsProvider(transaction.userId));
 
       if (context.mounted) {
@@ -221,6 +236,57 @@ class TransactionListCard extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao registrar estorno: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _markCoveredTransactionsAsPaid(
+    WidgetRef ref, {
+    required double refundAmount,
+    required DateTime paidAt,
+  }) async {
+    final creditCardId = transaction.creditCardId;
+    final dueDate = transaction.dueDate;
+
+    if (creditCardId == null || dueDate == null) return;
+
+    final transactions =
+        await ref.read(tx.transactionsProvider(transaction.userId).future);
+
+    final monthTransactions = transactions.where((t) {
+      if (t.userId != transaction.userId) return false;
+      if (t.type != 'expense') return false;
+      if (t.creditCardId != creditCardId) return false;
+      if (t.dueDate == null) return false;
+      if (t.status == 'paid') return false;
+
+      return t.dueDate!.year == dueDate.year && t.dueDate!.month == dueDate.month;
+    }).toList()
+      ..sort((a, b) {
+        final aDate = a.dueDate ?? a.createdAt;
+        final bDate = b.dueDate ?? b.createdAt;
+        final byDate = aDate.compareTo(bDate);
+        if (byDate != 0) return byDate;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+
+    double remaining = refundAmount;
+
+    for (final item in monthTransactions) {
+      if (remaining < item.amount) {
+        continue;
+      }
+
+      await ref.read(tx.transactionControllerProvider).updateStatus(
+            transactionId: item.id,
+            status: 'paid',
+            paidAt: paidAt,
+          );
+
+      remaining -= item.amount;
+
+      if (remaining <= 0) {
+        break;
       }
     }
   }

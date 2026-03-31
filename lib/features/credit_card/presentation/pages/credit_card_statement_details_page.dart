@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../transaction/domain/entities/finance_transaction.dart';
-import '../../../transaction/presentation/controllers/transaction_providers.dart';
+import '../../domain/entities/credit_card_adjustment.dart';
+import '../controllers/credit_card_statement_rollover_provider.dart';
 
 class CreditCardStatementDetailsPage extends ConsumerStatefulWidget {
   final String userId;
@@ -38,21 +39,22 @@ class _CreditCardStatementDetailsPageState
 
   @override
   Widget build(BuildContext context) {
-    final transactionsAsync = ref.watch(transactionsProvider(widget.userId));
+    final statementAsync = ref.watch(
+      creditCardStatementMonthProvider(
+        CreditCardStatementMonthQuery(
+          userId: widget.userId,
+          creditCardId: widget.creditCardId,
+          month: _selectedMonth,
+        ),
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Fatura • ${widget.creditCardName}'),
       ),
-      body: transactionsAsync.when(
-        data: (transactions) {
-          final monthTransactions = _filterTransactions(transactions);
-
-          final totalAmount = monthTransactions.fold<double>(
-            0,
-            (sum, item) => sum + item.amount,
-          );
-
+      body: statementAsync.when(
+        data: (statement) {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -107,51 +109,58 @@ class _CreditCardStatementDetailsPageState
                       builder: (context, constraints) {
                         final compact = constraints.maxWidth < 700;
 
+                        final summaryChildren = [
+                          _SummaryItem(
+                            title: 'Compras do mês',
+                            value: _formatCurrency(statement.purchasesTotal),
+                          ),
+                          _SummaryItem(
+                            title: 'Estornos/créditos do mês',
+                            value: _formatCurrency(-statement.monthAdjustmentsTotal),
+                          ),
+                          _SummaryItem(
+                            title: 'Crédito aplicado',
+                            value: _formatCurrency(-statement.appliedCredit),
+                          ),
+                          _SummaryItem(
+                            title: 'Total da fatura',
+                            value: _formatCurrency(statement.finalTotal),
+                            highlight: true,
+                          ),
+                        ];
+
+                        if (statement.carryOverCredit > 0) {
+                          summaryChildren.add(
+                            _SummaryItem(
+                              title: 'Crédito para o próximo mês',
+                              value: _formatCurrency(statement.carryOverCredit),
+                            ),
+                          );
+                        }
+
                         if (compact) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _SummaryItem(
-                                title: 'Cartão',
-                                value: widget.creditCardName,
-                              ),
-                              const SizedBox(height: 14),
-                              _SummaryItem(
-                                title: 'Lançamentos',
-                                value: '${monthTransactions.length}',
-                              ),
-                              const SizedBox(height: 14),
-                              _SummaryItem(
-                                title: 'Total da fatura',
-                                value: _formatCurrency(totalAmount),
-                                highlight: true,
-                              ),
+                              ...summaryChildren.expand((item) => [
+                                    item,
+                                    const SizedBox(height: 14),
+                                  ]),
                             ],
                           );
                         }
 
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: _SummaryItem(
-                                title: 'Cartão',
-                                value: widget.creditCardName,
-                              ),
-                            ),
-                            Expanded(
-                              child: _SummaryItem(
-                                title: 'Lançamentos',
-                                value: '${monthTransactions.length}',
-                              ),
-                            ),
-                            Expanded(
-                              child: _SummaryItem(
-                                title: 'Total da fatura',
-                                value: _formatCurrency(totalAmount),
-                                highlight: true,
-                              ),
-                            ),
-                          ],
+                        return Wrap(
+                          spacing: 24,
+                          runSpacing: 16,
+                          children: summaryChildren
+                              .map(
+                                (item) => SizedBox(
+                                  width: 220,
+                                  child: item,
+                                ),
+                              )
+                              .toList(),
                         );
                       },
                     ),
@@ -172,7 +181,7 @@ class _CreditCardStatementDetailsPageState
                       ),
                 ),
                 const SizedBox(height: 16),
-                if (monthTransactions.isEmpty)
+                if (statement.monthTransactions.isEmpty)
                   const Card(
                     child: Padding(
                       padding: EdgeInsets.all(20),
@@ -180,11 +189,42 @@ class _CreditCardStatementDetailsPageState
                     ),
                   )
                 else
-                  ...monthTransactions.map(
+                  ...statement.monthTransactions.map(
                     (transaction) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _StatementTransactionCard(
                         transaction: transaction,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                Text(
+                  'Estornos e créditos',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Créditos aplicados neste cartão no mês selecionado.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                if (statement.monthAdjustments.isEmpty)
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text('Nenhum estorno/crédito neste mês.'),
+                    ),
+                  )
+                else
+                  ...statement.monthAdjustments.map(
+                    (adjustment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _AdjustmentCard(
+                        adjustment: adjustment,
                       ),
                     ),
                   ),
@@ -200,28 +240,6 @@ class _CreditCardStatementDetailsPageState
         ),
       ),
     );
-  }
-
-  List<FinanceTransaction> _filterTransactions(
-    List<FinanceTransaction> transactions,
-  ) {
-    final filtered = transactions.where((transaction) {
-      if (transaction.type != 'expense') return false;
-      if (transaction.creditCardId != widget.creditCardId) return false;
-      if (transaction.dueDate == null) return false;
-
-      final dueDate = transaction.dueDate!;
-      return dueDate.year == _selectedMonth.year &&
-          dueDate.month == _selectedMonth.month;
-    }).toList();
-
-    filtered.sort((a, b) {
-      final aDate = a.dueDate ?? DateTime(2100);
-      final bDate = b.dueDate ?? DateTime(2100);
-      return aDate.compareTo(bDate);
-    });
-
-    return filtered;
   }
 
   String _monthLabel(DateTime date) {
@@ -244,7 +262,9 @@ class _CreditCardStatementDetailsPageState
   }
 
   String _formatCurrency(double value) {
-    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+    final isNegative = value < 0;
+    final formatted = value.abs().toStringAsFixed(2).replaceAll('.', ',');
+    return isNegative ? '-R\$ $formatted' : 'R\$ $formatted';
   }
 }
 
@@ -413,5 +433,95 @@ class _StatementTransactionCard extends StatelessWidget {
       default:
         return Colors.orangeAccent;
     }
+  }
+}
+
+class _AdjustmentCard extends StatelessWidget {
+  final CreditCardAdjustment adjustment;
+
+  const _AdjustmentCard({
+    required this.adjustment,
+  });
+
+  String _formatCurrency(double value) {
+    final isNegative = value < 0;
+    final formatted = value.abs().toStringAsFixed(2).replaceAll('.', ',');
+    return isNegative ? '-R\$ $formatted' : 'R\$ $formatted';
+  }
+
+  String _formatDate(DateTime date) {
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final y = date.year.toString();
+    return '$d/$m/$y';
+  }
+
+  String get _label {
+    switch (adjustment.type) {
+      case 'refund':
+        return 'Estorno';
+      default:
+        return 'Crédito aplicado';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isRefund = adjustment.type == 'refund';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.lightBlueAccent.withOpacity(0.14),
+              child: Icon(
+                isRefund ? Icons.undo : Icons.account_balance_wallet_outlined,
+                color: Colors.lightBlueAccent,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    adjustment.description,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.lightBlueAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _formatDate(adjustment.adjustmentDate),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _formatCurrency(-adjustment.amount),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.lightBlueAccent,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

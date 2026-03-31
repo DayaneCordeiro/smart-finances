@@ -133,7 +133,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
       _amountController.text.replaceAll(',', '.'),
     );
 
-    if (parsedValue == null) {
+    if (parsedValue == null || parsedValue <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Informe um valor válido')),
       );
@@ -150,7 +150,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
               userId: userId,
               categoryId: 'income_fixed',
               type: 'income',
-              description: _descriptionController.text,
+              description: _descriptionController.text.trim(),
               storeName: null,
               amount: parsedValue,
               dueDate: null,
@@ -170,8 +170,8 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
         await ref.read(transactionControllerProvider).createExpenseInstallments(
               userId: userId,
               categoryId: _selectedCategoryId!,
-              description: _descriptionController.text,
-              storeName: _storeController.text,
+              description: _descriptionController.text.trim(),
+              storeName: _storeController.text.trim(),
               totalAmount: parsedValue,
               installmentCount: installmentCount,
               firstDueDate: _mainDate,
@@ -182,8 +182,10 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
               userId: userId,
               categoryId: _selectedCategoryId!,
               type: 'expense',
-              description: _descriptionController.text,
-              storeName: null,
+              description: _descriptionController.text.trim(),
+              storeName: _storeController.text.trim().isEmpty
+                  ? null
+                  : _storeController.text.trim(),
               amount: parsedValue,
               dueDate: _mainDate,
               receivedDate: null,
@@ -314,11 +316,14 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
                                         context: context,
                                         firstDate: DateTime(2020),
                                         lastDate: DateTime(2100),
-                                        initialDate: tempPaidAt ?? DateTime.now(),
+                                        initialDate:
+                                            tempPaidAt ?? DateTime.now(),
                                       );
 
                                       if (selected != null) {
-                                        setModalState(() => tempPaidAt = selected);
+                                        setModalState(
+                                          () => tempPaidAt = selected,
+                                        );
                                       }
                                     }
                                   : null,
@@ -417,7 +422,8 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
             return const Center(child: Text('Nenhum usuário ativo'));
           }
 
-          final categoriesAsync = ref.watch(expenseCategoriesProvider(activeUser.id));
+          final categoriesAsync =
+              ref.watch(expenseCategoriesProvider(activeUser.id));
           final creditCardsAsync = ref.watch(creditCardsProvider(activeUser.id));
           final transactionsAsync =
               ref.watch(filteredTransactionsByMonthProvider(activeUser.id));
@@ -496,171 +502,172 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
   }
 
   Widget _buildTransactionList({
-  required BuildContext context,
-  required String activeUserId,
-  required List<dynamic> categories,
-  required AsyncValue<List<FinanceTransaction>> transactionsAsync,
-}) {
-  return Card(
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Transações do mês',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Veja, edite ou exclua lançamentos do mês selecionado.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
-                ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: transactionsAsync.when(
-              data: (transactions) {
-                if (transactions.isEmpty) {
-                  return const Center(
-                    child: Text('Nenhuma transação neste mês'),
-                  );
-                }
+    required BuildContext context,
+    required String activeUserId,
+    required List<dynamic> categories,
+    required AsyncValue<List<FinanceTransaction>> transactionsAsync,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Transações do mês',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Veja, edite ou exclua lançamentos do mês selecionado.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: transactionsAsync.when(
+                data: (transactions) {
+                  if (transactions.isEmpty) {
+                    return const Center(
+                      child: Text('Nenhuma transação neste mês'),
+                    );
+                  }
 
-                return ListView.separated(
-                  itemCount: transactions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    final transaction = transactions[index];
-                    final effectiveStatus =
-                        _effectiveStatusForDisplay(transaction);
+                  return ListView.separated(
+                    itemCount: transactions.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    itemBuilder: (context, index) {
+                      final transaction = transactions[index];
+                      final effectiveStatus =
+                          _effectiveStatusForDisplay(transaction);
 
-                    return TransactionListCard(
-                      transaction: transaction,
-                      effectiveStatus: effectiveStatus,
-                      onEdit: () async {
-                        final result = await Navigator.of(context)
-                            .push<EditTransactionResult>(
-                          MaterialPageRoute(
-                            builder: (_) => EditTransactionPage(
-                              transaction: transaction,
-                              categories: categories.cast(),
+                      return TransactionListCard(
+                        transaction: transaction,
+                        effectiveStatus: effectiveStatus,
+                        onEdit: () async {
+                          final result = await Navigator.of(context)
+                              .push<EditTransactionResult>(
+                            MaterialPageRoute(
+                              builder: (_) => EditTransactionPage(
+                                transaction: transaction,
+                                categories: categories.cast(),
+                              ),
                             ),
-                          ),
-                        );
+                          );
 
-                        if (result == null) return;
+                          if (result == null) return;
 
-                        try {
+                          try {
+                            await ref
+                                .read(transactionControllerProvider)
+                                .updateTransaction(
+                                  id: transaction.id,
+                                  userId: transaction.userId,
+                                  categoryId: transaction.type == 'income'
+                                      ? transaction.categoryId
+                                      : result.categoryId!,
+                                  type: transaction.type,
+                                  description: result.description,
+                                  storeName: transaction.storeName,
+                                  amount: result.amount,
+                                  dueDate: transaction.type == 'expense'
+                                      ? result.mainDate
+                                      : null,
+                                  receivedDate: transaction.type == 'income'
+                                      ? result.mainDate
+                                      : null,
+                                  status: result.status,
+                                  paidAt: result.paidAt,
+                                  createdAt: transaction.createdAt,
+                                  isInstallment: transaction.isInstallment,
+                                  installmentGroupId:
+                                      transaction.installmentGroupId,
+                                  installmentNumber:
+                                      transaction.installmentNumber,
+                                  installmentTotal:
+                                      transaction.installmentTotal,
+                                  installmentFullAmount:
+                                      transaction.installmentFullAmount,
+                                  creditCardId: transaction.creditCardId,
+                                  financingId: transaction.financingId,
+                                  financingInstallmentId:
+                                      transaction.financingInstallmentId,
+                                  paidAmount: transaction.paidAmount,
+                                  discountAmount: transaction.discountAmount,
+                                );
+
+                            _refreshFinancialData(activeUserId);
+
+                            if (!mounted) return;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Transação editada com sucesso'),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erro ao editar transação: $e'),
+                              ),
+                            );
+                          }
+                        },
+                        onDelete: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogContext) {
+                              return AlertDialog(
+                                title: const Text('Excluir transação'),
+                                content: const Text(
+                                  'Tem certeza que deseja excluir esta transação?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(false),
+                                    child: const Text('Cancelar'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(true),
+                                    child: const Text('Excluir'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+
+                          if (confirmed != true) return;
+
                           await ref
                               .read(transactionControllerProvider)
-                              .updateTransaction(
-                                id: transaction.id,
-                                userId: transaction.userId,
-                                categoryId: transaction.type == 'income'
-                                    ? transaction.categoryId
-                                    : result.categoryId!,
-                                type: transaction.type,
-                                description: result.description,
-                                storeName: transaction.storeName,
-                                amount: result.amount,
-                                dueDate: transaction.type == 'expense'
-                                    ? result.mainDate
-                                    : null,
-                                receivedDate: transaction.type == 'income'
-                                    ? result.mainDate
-                                    : null,
-                                status: result.status,
-                                paidAt: result.paidAt,
-                                createdAt: transaction.createdAt,
-                                isInstallment: transaction.isInstallment,
-                                installmentGroupId:
-                                    transaction.installmentGroupId,
-                                installmentNumber:
-                                    transaction.installmentNumber,
-                                installmentTotal: transaction.installmentTotal,
-                                installmentFullAmount:
-                                    transaction.installmentFullAmount,
-                                creditCardId: transaction.creditCardId,
-                                financingId: transaction.financingId,
-                                financingInstallmentId:
-                                    transaction.financingInstallmentId,
-                                paidAmount: transaction.paidAmount,
-                                discountAmount: transaction.discountAmount,
-                              );
+                              .deleteTransaction(transaction.id);
 
                           _refreshFinancialData(activeUserId);
-
-                          if (!mounted) return;
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Transação editada com sucesso'),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!mounted) return;
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Erro ao editar transação: $e'),
-                            ),
-                          );
-                        }
-                      },
-                      onDelete: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (dialogContext) {
-                            return AlertDialog(
-                              title: const Text('Excluir transação'),
-                              content: const Text(
-                                'Tem certeza que deseja excluir esta transação?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(dialogContext)
-                                      .pop(false),
-                                  child: const Text('Cancelar'),
-                                ),
-                                FilledButton(
-                                  onPressed: () => Navigator.of(dialogContext)
-                                      .pop(true),
-                                  child: const Text('Excluir'),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-
-                        if (confirmed != true) return;
-
-                        await ref
-                            .read(transactionControllerProvider)
-                            .deleteTransaction(transaction.id);
-
-                        _refreshFinancialData(activeUserId);
-                      },
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (error, stack) => Center(
-                child: Text('Erro ao carregar transações: $error'),
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                error: (error, stack) => Center(
+                  child: Text('Erro ao carregar transações: $error'),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildTransactionForm({
     required BuildContext context,
@@ -716,6 +723,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
                     _paidAtDate = null;
                   } else {
                     _storeController.clear();
+                    _installmentCountController.text = '2';
                   }
                 });
               },
@@ -739,6 +747,7 @@ class _TransactionPageState extends ConsumerState<TransactionPage>
                   _isInstallment = false;
                   _mainDate = DateTime.now();
                   _storeController.clear();
+                  _installmentCountController.text = '2';
                 });
               },
             ),

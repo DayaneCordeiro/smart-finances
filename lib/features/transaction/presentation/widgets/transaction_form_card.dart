@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 class TransactionFormCard extends StatefulWidget {
@@ -74,6 +72,11 @@ class TransactionFormCard extends StatefulWidget {
 }
 
 class _TransactionFormCardState extends State<TransactionFormCard> {
+  final _scrollController = ScrollController();
+  final _cardSectionKey = GlobalKey();
+
+  bool _shouldScrollToCardSection = false;
+
   @override
   void initState() {
     super.initState();
@@ -95,12 +98,37 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
       oldWidget.installmentCountController.removeListener(_refreshPreview);
       widget.installmentCountController.addListener(_refreshPreview);
     }
+
+    final turnedIntoCardPurchase =
+        oldWidget.selectedCreditCardId == null &&
+            widget.selectedCreditCardId != null;
+
+    if (turnedIntoCardPurchase) {
+      _shouldScrollToCardSection = true;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        final ctx = _cardSectionKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+            alignment: 0.15,
+          );
+        }
+
+        _shouldScrollToCardSection = false;
+      });
+    }
   }
 
   @override
   void dispose() {
     widget.amountController.removeListener(_refreshPreview);
     widget.installmentCountController.removeListener(_refreshPreview);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -119,6 +147,10 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
   int? get _parsedInstallments {
     return int.tryParse(widget.installmentCountController.text.trim());
   }
+
+  bool get _isExpense => widget.selectedType == 'expense';
+
+  bool get _isCreditCardPurchase => widget.selectedCreditCardId != null;
 
   double _ceilToCents(double value) {
     return (value * 100).ceil() / 100;
@@ -160,9 +192,8 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isExpense = widget.selectedType == 'expense';
-
     return SingleChildScrollView(
+      controller: _scrollController,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,20 +216,10 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
           ),
           const SizedBox(height: 20),
 
-          if (isExpense && widget.isInstallment) ...[
-            TextField(
-              controller: widget.storeController,
-              decoration: const InputDecoration(
-                labelText: 'Loja',
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
           TextField(
             controller: widget.descriptionController,
             decoration: InputDecoration(
-              labelText: isExpense ? 'Descrição' : 'Descrição da receita',
+              labelText: _isExpense ? 'Descrição' : 'Descrição da receita',
             ),
           ),
           const SizedBox(height: 16),
@@ -207,12 +228,12 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
             controller: widget.amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: isExpense ? 'Valor' : 'Valor recebido',
+              labelText: _isExpense ? 'Valor total' : 'Valor recebido',
             ),
           ),
           const SizedBox(height: 16),
 
-          if (isExpense) ...[
+          if (_isExpense) ...[
             DropdownButtonFormField<String>(
               value: widget.selectedCategoryId,
               decoration: const InputDecoration(
@@ -229,48 +250,13 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
             const SizedBox(height: 16),
           ],
 
-          if (isExpense) ...[
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Compra parcelada'),
-              subtitle: const Text(
-                'Se ativo, gera despesas mensais automaticamente',
-              ),
-              value: widget.isInstallment,
-              onChanged: widget.onInstallmentChanged,
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          if (isExpense && widget.isInstallment) ...[
-            DropdownButtonFormField<String>(
-              value: widget.selectedCreditCardId,
-              decoration: const InputDecoration(
-                labelText: 'Cartão de crédito',
-              ),
-              items: widget.creditCards.map((card) {
-                return DropdownMenuItem<String>(
-                  value: card.id as String,
-                  child: Text(card.name as String),
-                );
-              }).toList(),
-              onChanged: widget.onCreditCardChanged,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: widget.installmentCountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Quantidade de parcelas',
-              ),
-            ),
-            const SizedBox(height: 20),
+          if (_isExpense) ...[
             Container(
-              width: double.infinity,
+              key: _cardSectionKey,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: Colors.white.withOpacity(0.08),
                 ),
@@ -278,55 +264,295 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Prévia do parcelamento',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 18,
+                        child: Icon(Icons.credit_card, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Forma de pagamento',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   Text(
-                    'Primeira parcela',
+                    'Defina se essa despesa foi feita no cartão ou não.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                         ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(widget.mainDate),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  const SizedBox(height: 16),
+
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment<String>(
+                        value: 'wallet',
+                        icon: Icon(Icons.account_balance_wallet_outlined),
+                        label: Text('Dinheiro / conta'),
+                      ),
+                      ButtonSegment<String>(
+                        value: 'credit',
+                        icon: Icon(Icons.credit_card),
+                        label: Text('Cartão de crédito'),
+                      ),
+                    ],
+                    selected: {
+                      _isCreditCardPurchase ? 'credit' : 'wallet',
+                    },
+                    onSelectionChanged: (value) {
+                      final selection = value.first;
+
+                      if (selection == 'wallet') {
+                        widget.onCreditCardChanged(null);
+                        if (widget.isInstallment) {
+                          widget.onInstallmentChanged(false);
+                        }
+                        setState(() {
+                          widget.storeController.clear();
+                          widget.installmentCountController.text = '2';
+                        });
+                        return;
+                      }
+
+                      if (selection == 'credit' &&
+                          widget.selectedCreditCardId == null) {
+                        setState(() {});
+                      }
+                    },
                   ),
-                  const SizedBox(height: 14),
+
+                  if (_isCreditCardPurchase || widget.creditCards.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: widget.selectedCreditCardId,
+                      decoration: const InputDecoration(
+                        labelText: 'Cartão de crédito',
+                        hintText: 'Selecione o cartão usado na compra',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Não foi no cartão'),
+                        ),
+                        ...widget.creditCards.map((card) {
+                          return DropdownMenuItem<String>(
+                            value: card.id as String,
+                            child: Text(card.name as String),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        widget.onCreditCardChanged(value);
+
+                        if (value == null && widget.isInstallment) {
+                          widget.onInstallmentChanged(false);
+                          widget.storeController.clear();
+                          widget.installmentCountController.text = '2';
+                        }
+                      },
+                    ),
+                  ],
+
+                  if (_isCreditCardPurchase) ...[
+                    const SizedBox(height: 18),
+                    Text(
+                      'Como essa compra foi lançada no cartão?',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white70,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment<String>(
+                          value: 'single',
+                          icon: Icon(Icons.looks_one_outlined),
+                          label: Text('À vista (1x)'),
+                        ),
+                        ButtonSegment<String>(
+                          value: 'installment',
+                          icon: Icon(Icons.view_week_outlined),
+                          label: Text('Parcelada'),
+                        ),
+                      ],
+                      selected: {
+                        widget.isInstallment ? 'installment' : 'single',
+                      },
+                      onSelectionChanged: (value) {
+                        final selection = value.first;
+
+                        if (selection == 'single') {
+                          widget.onInstallmentChanged(false);
+                          setState(() {
+                            widget.storeController.clear();
+                            widget.installmentCountController.text = '2';
+                          });
+                        } else {
+                          widget.onInstallmentChanged(true);
+                          if (widget.installmentCountController.text.trim().isEmpty ||
+                              widget.installmentCountController.text.trim() == '1') {
+                            widget.installmentCountController.text = '2';
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      widget.isInstallment
+                          ? 'Parcelas mensais serão geradas automaticamente.'
+                          : 'Essa compra entra na fatura como 1x.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white70,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (_isExpense && _isCreditCardPurchase && widget.isInstallment) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.lightBlueAccent.withOpacity(0.22),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 18,
+                        child: Icon(Icons.receipt_long_outlined, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Dados do parcelamento',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Text(
-                    'Última parcela',
+                    'Preencha os dados da compra parcelada.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                         ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(_lastInstallmentDate),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  const SizedBox(height: 18),
+
+                  TextField(
+                    controller: widget.storeController,
+                    autofocus: _shouldScrollToCardSection,
+                    decoration: const InputDecoration(
+                      labelText: 'Loja',
+                      hintText: 'Ex.: Magalu, Airbnb, Mercado Livre',
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Valor da parcela',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                        ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: widget.installmentCountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Quantidade de parcelas',
+                      hintText: 'Ex.: 2, 3, 10, 12',
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _installmentAmountPreview != null
-                        ? _formatCurrency(_installmentAmountPreview!)
-                        : '--',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                  const SizedBox(height: 20),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.08),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Prévia do parcelamento',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Primeira parcela',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(widget.mainDate),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Última parcela',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(_lastInstallmentDate),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Valor estimado de cada parcela',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _installmentAmountPreview != null
+                              ? _formatCurrency(_installmentAmountPreview!)
+                              : '--',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -337,7 +563,7 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
-              isExpense
+              _isExpense
                   ? widget.isInstallment
                       ? 'Data da primeira parcela'
                       : 'Data de vencimento'
@@ -351,7 +577,7 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
           ),
           const SizedBox(height: 16),
 
-          if (isExpense && !widget.isInstallment) ...[
+          if (_isExpense && !widget.isInstallment) ...[
             DropdownButtonFormField<String>(
               value: widget.selectedStatus,
               decoration: const InputDecoration(
@@ -405,7 +631,7 @@ class _TransactionFormCardState extends State<TransactionFormCard> {
             ],
           ],
 
-          if (!isExpense) ...[
+          if (!_isExpense) ...[
             const SizedBox(height: 8),
             Text(
               'Receitas são registradas como recebidas na data informada.',

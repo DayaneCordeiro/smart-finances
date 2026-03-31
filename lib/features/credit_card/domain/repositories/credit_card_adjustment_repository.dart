@@ -7,4 +7,9 @@ abstract class CreditCardAdjustmentRepository {
     required String userId,
     required String creditCardId,
   });
+
+  Future<void> updateRemainingAmount({
+    required String adjustmentId,
+    required double remainingAmount,
+  });
 }

@@ -12,7 +12,7 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 13,
+      version: 16,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -75,6 +75,18 @@ class AppDatabase {
         if (oldVersion < 13) {
           await _deleteLegacyRefundTransactions(db);
         }
+
+        if (oldVersion < 14) {
+          await _ensureCreditCardAdjustmentRemainingAmount(db);
+        }
+
+        if (oldVersion < 15) {
+          await _ensureCreditCardAdjustmentRemainingAmount(db);
+        }
+
+        if (oldVersion < 16) {
+          await _ensureCreditCardAdjustmentRemainingAmount(db);
+        }
       },
       onOpen: (db) async {
         await _createUsersTable(db);
@@ -89,9 +101,9 @@ class AppDatabase {
         await _ensureTransactionCreditCardColumn(db);
         await _ensureTransactionStoreNameColumn(db);
         await _ensureTransactionFinancingColumns(db);
+        await _ensureCreditCardAdjustmentRemainingAmount(db);
 
         await _ensureDefaultCategoriesForAllUsers(db);
-
         await _deleteLegacyRefundTransactions(db);
       },
     );
@@ -211,6 +223,7 @@ class AppDatabase {
         credit_card_id TEXT NOT NULL,
         type TEXT NOT NULL,
         amount REAL NOT NULL,
+        remaining_amount REAL NOT NULL DEFAULT 0,
         adjustment_date TEXT NOT NULL,
         description TEXT NOT NULL,
         related_transaction_id TEXT,
@@ -303,6 +316,26 @@ class AppDatabase {
         'ALTER TABLE transactions ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0',
       );
     }
+  }
+
+  Future<void> _ensureCreditCardAdjustmentRemainingAmount(Database db) async {
+    await _createCreditCardAdjustmentsTable(db);
+
+    final columns =
+        await db.rawQuery("PRAGMA table_info(credit_card_adjustments)");
+    final columnNames = columns.map((item) => item['name'] as String).toSet();
+
+    if (!columnNames.contains('remaining_amount')) {
+      await db.execute(
+        'ALTER TABLE credit_card_adjustments ADD COLUMN remaining_amount REAL NOT NULL DEFAULT 0',
+      );
+    }
+
+    await db.execute('''
+      UPDATE credit_card_adjustments
+      SET remaining_amount = amount
+      WHERE remaining_amount IS NULL OR remaining_amount = 0
+    ''');
   }
 
   Future<void> _ensureDefaultCategoriesForAllUsers(Database db) async {
