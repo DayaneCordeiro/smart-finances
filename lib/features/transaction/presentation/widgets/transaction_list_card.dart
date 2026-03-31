@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../credit_card/domain/entities/credit_card_adjustment.dart';
+import '../../../credit_card/presentation/controllers/credit_card_adjustment_providers.dart';
 import '../../../credit_card/presentation/controllers/credit_card_debt_provider.dart';
-import '../../../credit_card/presentation/controllers/credit_card_providers.dart';
-import '../../../dashboard/presentation/controllers/dashboard_providers.dart';
+import '../../../dashboard/presentation/controllers/dashboard_providers.dart'
+    as dash;
 import '../../../financing/domain/entities/financing_installment.dart';
 import '../../../financing/presentation/controllers/financing_providers.dart';
 import '../../domain/entities/finance_transaction.dart';
-import '../controllers/transaction_providers.dart';
+import '../controllers/transaction_providers.dart' as tx;
 import 'transaction_type_badge.dart';
 
 class TransactionListCard extends ConsumerWidget {
@@ -104,10 +107,12 @@ class TransactionListCard extends ConsumerWidget {
               paidAt: result.paidAt,
             );
 
-        ref.invalidate(transactionsProvider(transaction.userId));
-        ref.invalidate(filteredTransactionsByMonthProvider(transaction.userId));
-        ref.invalidate(monthlySummaryProvider(transaction.userId));
-        ref.invalidate(dashboardActiveUserSummaryProvider);
+        ref.invalidate(tx.transactionsProvider(transaction.userId));
+        ref.invalidate(
+          dash.filteredTransactionsByMonthProvider(transaction.userId),
+        );
+        ref.invalidate(dash.monthlySummaryProvider(transaction.userId));
+        ref.invalidate(dash.dashboardActiveUserSummaryProvider);
         ref.invalidate(financingInstallmentsProvider(transaction.financingId!));
         ref.invalidate(financingSummaryProvider(transaction.financingId!));
 
@@ -121,9 +126,7 @@ class TransactionListCard extends ConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erro ao registrar pagamento: $e'),
-            ),
+            SnackBar(content: Text('Erro ao registrar pagamento: $e')),
           );
         }
       }
@@ -139,30 +142,28 @@ class TransactionListCard extends ConsumerWidget {
     if (result == null) return;
 
     try {
-      await ref.read(transactionControllerProvider).updateStatus(
+      await ref.read(tx.transactionControllerProvider).updateStatus(
             transactionId: transaction.id,
             status: 'paid',
             paidAt: result.paidAt,
           );
 
-      ref.invalidate(transactionsProvider(transaction.userId));
-      ref.invalidate(filteredTransactionsByMonthProvider(transaction.userId));
-      ref.invalidate(monthlySummaryProvider(transaction.userId));
-      ref.invalidate(dashboardActiveUserSummaryProvider);
+      ref.invalidate(tx.transactionsProvider(transaction.userId));
+      ref.invalidate(
+        dash.filteredTransactionsByMonthProvider(transaction.userId),
+      );
+      ref.invalidate(dash.monthlySummaryProvider(transaction.userId));
+      ref.invalidate(dash.dashboardActiveUserSummaryProvider);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transação marcada como paga'),
-          ),
+          const SnackBar(content: Text('Transação marcada como paga')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar pagamento: $e'),
-          ),
+          SnackBar(content: Text('Erro ao registrar pagamento: $e')),
         );
       }
     }
@@ -183,40 +184,42 @@ class TransactionListCard extends ConsumerWidget {
     if (result == null) return;
 
     try {
-      await ref.read(transactionControllerProvider).createTransaction(
-            userId: transaction.userId,
-            categoryId: 'refund',
-            type: 'expense',
-            description: 'Estorno - ${transaction.description}',
-            storeName: transaction.storeName,
-            amount: -result.amount,
-            dueDate: result.receivedAt,
-            receivedDate: null,
-            status: 'pending',
-            paidAt: null,
-            creditCardId: transaction.creditCardId,
-          );
+      final adjustment = CreditCardAdjustment(
+        id: const Uuid().v4(),
+        userId: transaction.userId,
+        creditCardId: transaction.creditCardId!,
+        type: 'refund',
+        amount: result.amount,
+        adjustmentDate: result.receivedAt,
+        description: 'Estorno ${transaction.description}',
+        relatedTransactionId: transaction.id,
+        createdAt: DateTime.now(),
+      );
 
-      ref.invalidate(transactionsProvider(transaction.userId));
-      ref.invalidate(filteredTransactionsByMonthProvider(transaction.userId));
-      ref.invalidate(monthlySummaryProvider(transaction.userId));
-      ref.invalidate(dashboardActiveUserSummaryProvider);
-      ref.invalidate(creditCardStatementsProvider(transaction.userId));
+      await ref
+          .read(creditCardAdjustmentRepositoryProvider)
+          .createAdjustment(adjustment);
+
+      ref.invalidate(
+        creditCardAdjustmentsByCardProvider(
+          CreditCardAdjustmentQuery(
+            userId: transaction.userId,
+            creditCardId: transaction.creditCardId!,
+          ),
+        ),
+      );
+      ref.invalidate(dash.dashboardActiveUserSummaryProvider);
       ref.invalidate(creditCardDebtsProvider(transaction.userId));
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Estorno registrado como crédito na fatura'),
-          ),
+          const SnackBar(content: Text('Estorno registrado no cartão')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar estorno: $e'),
-          ),
+          SnackBar(content: Text('Erro ao registrar estorno: $e')),
         );
       }
     }
@@ -488,10 +491,7 @@ class _CompactActionButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, size: 18),
-      label: Text(
-        label,
-        overflow: TextOverflow.ellipsis,
-      ),
+      label: Text(label, overflow: TextOverflow.ellipsis),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(42),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -857,7 +857,7 @@ class _RefundDialogState extends State<_RefundDialog> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Esse valor será abatido da fatura do cartão.',
+                  'Esse estorno será salvo como crédito interno do cartão.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.white70,
                       ),

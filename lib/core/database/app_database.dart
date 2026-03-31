@@ -1,8 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../constants/default_categories.dart';
-
 class AppDatabase {
   static Database? _database;
 
@@ -14,7 +12,7 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 11,
+      version: 13,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -22,6 +20,7 @@ class AppDatabase {
         await _createCreditCardsTable(db);
         await _createFinancingsTable(db);
         await _createFinancingInstallmentsTable(db);
+        await _createCreditCardAdjustmentsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -68,6 +67,14 @@ class AppDatabase {
         if (oldVersion < 11) {
           await _ensureDefaultCategoriesForAllUsers(db);
         }
+
+        if (oldVersion < 12) {
+          await _createCreditCardAdjustmentsTable(db);
+        }
+
+        if (oldVersion < 13) {
+          await _deleteLegacyRefundTransactions(db);
+        }
       },
       onOpen: (db) async {
         await _createUsersTable(db);
@@ -76,6 +83,7 @@ class AppDatabase {
         await _createCreditCardsTable(db);
         await _createFinancingsTable(db);
         await _createFinancingInstallmentsTable(db);
+        await _createCreditCardAdjustmentsTable(db);
 
         await _ensureTransactionInstallmentColumns(db);
         await _ensureTransactionCreditCardColumn(db);
@@ -83,6 +91,8 @@ class AppDatabase {
         await _ensureTransactionFinancingColumns(db);
 
         await _ensureDefaultCategoriesForAllUsers(db);
+
+        await _deleteLegacyRefundTransactions(db);
       },
     );
 
@@ -193,6 +203,22 @@ class AppDatabase {
     ''');
   }
 
+  Future<void> _createCreditCardAdjustmentsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS credit_card_adjustments (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        credit_card_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        adjustment_date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        related_transaction_id TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+  }
+
   Future<void> _ensureTransactionInstallmentColumns(Database db) async {
     final columns = await db.rawQuery("PRAGMA table_info(transactions)");
     final columnNames = columns.map((item) => item['name'] as String).toSet();
@@ -293,34 +319,73 @@ class AppDatabase {
     Database db,
     String userId,
   ) async {
-    for (final category in defaultExpenseCategories) {
+    const defaultCategories = [
+      {
+        'id': 'fixed_expense',
+        'name': 'Despesa fixa',
+        'type': 'expense',
+      },
+      {
+        'id': 'variable_expense',
+        'name': 'Despesa variável',
+        'type': 'expense',
+      },
+      {
+        'id': 'extra_expense',
+        'name': 'Despesa extra',
+        'type': 'expense',
+      },
+      {
+        'id': 'financing_expense',
+        'name': 'Financiamento',
+        'type': 'expense',
+      },
+      {
+        'id': 'refund',
+        'name': 'Estorno',
+        'type': 'expense',
+      },
+    ];
+
+    for (final category in defaultCategories) {
       final existing = await db.query(
         'categories',
         columns: ['id'],
         where: 'id = ? AND user_id = ?',
-        whereArgs: [category.id, userId],
+        whereArgs: [category['id'], userId],
         limit: 1,
       );
 
       if (existing.isEmpty) {
         await db.insert('categories', {
-          'id': category.id,
+          'id': category['id'],
           'user_id': userId,
-          'name': category.name,
-          'type': category.type,
+          'name': category['name'],
+          'type': category['type'],
           'created_at': DateTime.now().toIso8601String(),
         });
       } else {
         await db.update(
           'categories',
           {
-            'name': category.name,
-            'type': category.type,
+            'name': category['name'],
+            'type': category['type'],
           },
           where: 'id = ? AND user_id = ?',
-          whereArgs: [category.id, userId],
+          whereArgs: [category['id'], userId],
         );
       }
     }
+  }
+
+  Future<void> _deleteLegacyRefundTransactions(Database db) async {
+    await db.delete(
+      'transactions',
+      where: '''
+        category_id = ? OR
+        description LIKE ?
+      ''',
+      whereArgs: ['refund', 'Estorno %'],
+    );
   }
 }
