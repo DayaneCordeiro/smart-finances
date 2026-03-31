@@ -50,6 +50,6 @@ const defaultExpenseCategories = <DefaultCategoryDefinition>[
   DefaultCategoryDefinition(
     id: DefaultCategoryIds.refund,
     name: DefaultCategoryNames.refund,
-    type: 'income',
+    type: 'expense',
   ),
 ];

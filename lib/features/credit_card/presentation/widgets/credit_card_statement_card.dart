@@ -21,7 +21,9 @@ class CreditCardStatementCard extends StatelessWidget {
   });
 
   String _formatCurrency(double value) {
-    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+    final isNegative = value < 0;
+    final formatted = value.abs().toStringAsFixed(2).replaceAll('.', ',');
+    return isNegative ? '-R\$ $formatted' : 'R\$ $formatted';
   }
 
   String _formatDate(DateTime date) {
@@ -33,10 +35,26 @@ class CreditCardStatementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor = isPaid ? Colors.greenAccent : Colors.orangeAccent;
-    final iconBg = isPaid
-        ? Colors.greenAccent.withOpacity(0.14)
-        : Colors.blueAccent.withOpacity(0.16);
+    final hasCredit = amount < 0;
+    final noPaymentNeeded = amount <= 0;
+
+    final badgeColor = hasCredit
+        ? Colors.lightBlueAccent
+        : isPaid
+            ? Colors.greenAccent
+            : Colors.orangeAccent;
+
+    final badgeText = hasCredit
+        ? 'Crédito disponível'
+        : isPaid
+            ? 'Paga'
+            : 'Em aberto';
+
+    final iconBg = hasCredit
+        ? Colors.lightBlueAccent.withOpacity(0.14)
+        : isPaid
+            ? Colors.greenAccent.withOpacity(0.14)
+            : Colors.blueAccent.withOpacity(0.16);
 
     return Material(
       color: Colors.transparent,
@@ -79,7 +97,7 @@ class CreditCardStatementCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '$itemsCount lançamento(s) vinculado(s)',
+                            '$itemsCount lançamento(s) do mês',
                             style:
                                 Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       color: Colors.white70,
@@ -101,7 +119,7 @@ class CreditCardStatementCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        isPaid ? 'Paga' : 'Em aberto',
+                        badgeText,
                         style: TextStyle(
                           color: badgeColor,
                           fontWeight: FontWeight.w700,
@@ -112,7 +130,7 @@ class CreditCardStatementCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Fatura do mês',
+                  hasCredit ? 'Crédito acumulado' : 'Fatura do mês',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.white70,
                       ),
@@ -125,9 +143,18 @@ class CreditCardStatementCard extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 16),
-                if (isPaid && paidAt != null) ...[
+                if (!hasCredit && isPaid && paidAt != null) ...[
                   Text(
                     'Paga em ${_formatDate(paidAt!)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (hasCredit) ...[
+                  Text(
+                    'Esse valor será abatido na próxima fatura.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                         ),
@@ -150,12 +177,14 @@ class CreditCardStatementCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: isPaid ? null : onPayBill,
+                        onPressed: noPaymentNeeded ? null : onPayBill,
                         icon: Icon(
-                          isPaid ? Icons.check_circle_outline : Icons.payment,
+                          noPaymentNeeded
+                              ? Icons.check_circle_outline
+                              : Icons.payment,
                         ),
                         label: Text(
-                          isPaid ? 'Fatura já paga' : 'Pagar fatura',
+                          noPaymentNeeded ? 'Sem pagamento' : 'Pagar fatura',
                         ),
                       ),
                     ),

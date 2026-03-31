@@ -84,6 +84,9 @@ class TransactionLocalDataSource {
       final dueDateRaw = row['due_date'] as String?;
       if (dueDateRaw == null) continue;
 
+      final amount = (row['amount'] as num).toDouble();
+      if (amount <= 0) continue;
+
       final dueDate = DateTime.parse(dueDateRaw);
       if (dueDate.year == year && dueDate.month == month) {
         await db.update(

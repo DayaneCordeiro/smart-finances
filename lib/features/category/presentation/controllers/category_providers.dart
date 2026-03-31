@@ -16,8 +16,8 @@ final expenseCategoriesProvider =
   final db = await appDatabase.database;
   final result = await db.query(
     'categories',
-    where: 'user_id = ? AND type = ?',
-    whereArgs: [userId, 'expense'],
+    where: 'user_id = ? AND type = ? AND id != ?',
+    whereArgs: [userId, 'expense', 'refund'],
     orderBy: '''
       CASE id
         WHEN 'fixed_expense' THEN 1

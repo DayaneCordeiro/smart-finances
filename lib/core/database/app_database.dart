@@ -14,7 +14,7 @@ class AppDatabase {
 
     _database = await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: (db, version) async {
         await _createUsersTable(db);
         await _createCategoriesTable(db);
@@ -62,6 +62,10 @@ class AppDatabase {
         }
 
         if (oldVersion < 10) {
+          await _ensureDefaultCategoriesForAllUsers(db);
+        }
+
+        if (oldVersion < 11) {
           await _ensureDefaultCategoriesForAllUsers(db);
         }
       },
@@ -306,6 +310,16 @@ class AppDatabase {
           'type': category.type,
           'created_at': DateTime.now().toIso8601String(),
         });
+      } else {
+        await db.update(
+          'categories',
+          {
+            'name': category.name,
+            'type': category.type,
+          },
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [category.id, userId],
+        );
       }
     }
   }

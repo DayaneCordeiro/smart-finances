@@ -35,10 +35,13 @@ class TransactionListCard extends ConsumerWidget {
       _isExpense &&
       transaction.isInstallment &&
       transaction.creditCardId != null &&
-      !_isFinancing;
+      !_isFinancing &&
+      transaction.amount > 0;
 
   String _formatCurrency(double value) {
-    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+    final isNegative = value < 0;
+    final formatted = value.abs().toStringAsFixed(2).replaceAll('.', ',');
+    return isNegative ? '-R\$ $formatted' : 'R\$ $formatted';
   }
 
   String _formatDate(DateTime date) {
@@ -183,14 +186,14 @@ class TransactionListCard extends ConsumerWidget {
       await ref.read(transactionControllerProvider).createTransaction(
             userId: transaction.userId,
             categoryId: 'refund',
-            type: 'income',
+            type: 'expense',
             description: 'Estorno - ${transaction.description}',
             storeName: transaction.storeName,
-            amount: result.amount,
-            dueDate: null,
-            receivedDate: result.receivedAt,
-            status: 'received',
-            paidAt: result.receivedAt,
+            amount: -result.amount,
+            dueDate: result.receivedAt,
+            receivedDate: null,
+            status: 'pending',
+            paidAt: null,
             creditCardId: transaction.creditCardId,
           );
 
@@ -204,7 +207,7 @@ class TransactionListCard extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Estorno registrado com sucesso'),
+            content: Text('Estorno registrado como crédito na fatura'),
           ),
         );
       }
@@ -854,7 +857,7 @@ class _RefundDialogState extends State<_RefundDialog> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'As parcelas futuras continuarão normalmente.',
+                  'Esse valor será abatido da fatura do cartão.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.white70,
                       ),

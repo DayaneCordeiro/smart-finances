@@ -1,33 +1,43 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
-import '../../../category/domain/entities/app_category.dart';
-import '../../../credit_card/domain/entities/credit_card_entity.dart';
-
-class TransactionFormCard extends StatelessWidget {
+class TransactionFormCard extends StatefulWidget {
   final String selectedType;
+
   final TextEditingController storeController;
   final TextEditingController descriptionController;
   final TextEditingController amountController;
   final TextEditingController installmentCountController;
-  final List<AppCategory> expenseCategories;
-  final List<CreditCardEntity> creditCards;
+
+  final List<dynamic> expenseCategories;
+  final List<dynamic> creditCards;
+
   final String? selectedCategoryId;
   final ValueChanged<String?> onCategoryChanged;
+
   final String? selectedCreditCardId;
   final ValueChanged<String?> onCreditCardChanged;
+
   final String selectedStatus;
   final ValueChanged<String?> onStatusChanged;
+
   final bool markAsPaid;
   final ValueChanged<bool> onMarkAsPaidChanged;
+
   final bool isInstallment;
   final ValueChanged<bool> onInstallmentChanged;
+
   final DateTime mainDate;
   final VoidCallback onPickMainDate;
+
   final DateTime? paidAtDate;
   final VoidCallback onPickPaidAtDate;
   final VoidCallback onClearPaidAt;
+
   final bool isSaving;
   final VoidCallback onSave;
+
   final ValueChanged<Set<String>> onTypeChanged;
 
   const TransactionFormCard({
@@ -60,206 +70,290 @@ class TransactionFormCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isExpense = selectedType == 'expense';
-    final showStoreField = isExpense && isInstallment;
-    final title = isExpense ? 'Nova despesa' : 'Nova receita';
+  State<TransactionFormCard> createState() => _TransactionFormCardState();
+}
 
-    double? parsedTotal;
-    int? parsedInstallments;
-    double? previewInstallmentValue;
+class _TransactionFormCardState extends State<TransactionFormCard> {
+  @override
+  void initState() {
+    super.initState();
+    widget.amountController.addListener(_refreshPreview);
+    widget.installmentCountController.addListener(_refreshPreview);
+  }
 
-    if (isExpense && isInstallment) {
-      parsedTotal = double.tryParse(amountController.text.replaceAll(',', '.'));
-      parsedInstallments = int.tryParse(installmentCountController.text.trim());
+  @override
+  void didUpdateWidget(covariant TransactionFormCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-      if (parsedTotal != null &&
-          parsedInstallments != null &&
-          parsedInstallments > 0) {
-        previewInstallmentValue = parsedTotal / parsedInstallments;
-      }
+    if (oldWidget.amountController != widget.amountController) {
+      oldWidget.amountController.removeListener(_refreshPreview);
+      widget.amountController.addListener(_refreshPreview);
     }
+
+    if (oldWidget.installmentCountController !=
+        widget.installmentCountController) {
+      oldWidget.installmentCountController.removeListener(_refreshPreview);
+      widget.installmentCountController.addListener(_refreshPreview);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.amountController.removeListener(_refreshPreview);
+    widget.installmentCountController.removeListener(_refreshPreview);
+    super.dispose();
+  }
+
+  void _refreshPreview() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  double? get _parsedAmount {
+    return double.tryParse(
+      widget.amountController.text.trim().replaceAll(',', '.'),
+    );
+  }
+
+  int? get _parsedInstallments {
+    return int.tryParse(widget.installmentCountController.text.trim());
+  }
+
+  double _ceilToCents(double value) {
+    return (value * 100).ceil() / 100;
+  }
+
+  double? get _installmentAmountPreview {
+    final amount = _parsedAmount;
+    final installments = _parsedInstallments;
+
+    if (amount == null || amount <= 0) return null;
+    if (installments == null || installments < 2) return null;
+
+    return _ceilToCents(amount / installments);
+  }
+
+  DateTime get _lastInstallmentDate {
+    final installments = _parsedInstallments;
+    if (installments == null || installments < 2) {
+      return widget.mainDate;
+    }
+
+    return DateTime(
+      widget.mainDate.year,
+      widget.mainDate.month + (installments - 1),
+      widget.mainDate.day,
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    return '$day/$month/$year';
+  }
+
+  String _formatCurrency(double value) {
+    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isExpense = widget.selectedType == 'expense';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-          ),
-          const SizedBox(height: 16),
           SegmentedButton<String>(
             segments: const [
-              ButtonSegment(
+              ButtonSegment<String>(
                 value: 'expense',
-                label: Text('Despesa'),
                 icon: Icon(Icons.arrow_upward),
+                label: Text('Despesa'),
               ),
-              ButtonSegment(
+              ButtonSegment<String>(
                 value: 'income',
-                label: Text('Receita'),
                 icon: Icon(Icons.arrow_downward),
+                label: Text('Receita'),
               ),
             ],
-            selected: {selectedType},
-            onSelectionChanged: onTypeChanged,
+            selected: {widget.selectedType},
+            onSelectionChanged: widget.onTypeChanged,
           ),
-          const SizedBox(height: 16),
-          if (showStoreField) ...[
+          const SizedBox(height: 20),
+
+          if (isExpense && widget.isInstallment) ...[
             TextField(
-              controller: storeController,
+              controller: widget.storeController,
               decoration: const InputDecoration(
                 labelText: 'Loja',
-                hintText: 'Ex.: Magalu, Shopee, Mercado Livre',
               ),
             ),
             const SizedBox(height: 16),
           ],
+
           TextField(
-            controller: descriptionController,
+            controller: widget.descriptionController,
             decoration: InputDecoration(
-              labelText: 'Descrição',
-              hintText: isExpense
-                  ? 'Ex.: Internet, Tablet, Cortinas, Vestido'
-                  : 'Ex.: Salário, Freelance',
+              labelText: isExpense ? 'Descrição' : 'Descrição da receita',
             ),
           ),
           const SizedBox(height: 16),
+
           TextField(
-            controller: amountController,
-            keyboardType: const TextInputType.numberWithOptions(
-              decimal: true,
-            ),
+            controller: widget.amountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: isInstallment && isExpense
-                  ? 'Valor total da compra'
-                  : 'Valor',
+              labelText: isExpense ? 'Valor' : 'Valor recebido',
             ),
           ),
           const SizedBox(height: 16),
+
           if (isExpense) ...[
             DropdownButtonFormField<String>(
-              value: selectedCategoryId,
+              value: widget.selectedCategoryId,
               decoration: const InputDecoration(
                 labelText: 'Categoria',
               ),
-              items: expenseCategories.map((category) {
-                return DropdownMenuItem(
-                  value: category.id,
-                  child: Text(category.name),
+              items: widget.expenseCategories.map((category) {
+                return DropdownMenuItem<String>(
+                  value: category.id as String,
+                  child: Text(category.name as String),
                 );
               }).toList(),
-              onChanged: onCategoryChanged,
+              onChanged: widget.onCategoryChanged,
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: selectedCreditCardId,
-              decoration: InputDecoration(
-                labelText: isInstallment
-                    ? 'Cartão de crédito'
-                    : 'Cartão de crédito (opcional)',
-              ),
-              items: [
-                if (!isInstallment)
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text('Nenhum'),
-                  ),
-                ...creditCards.map((card) {
-                  return DropdownMenuItem(
-                    value: card.id,
-                    child: Text(card.name),
-                  );
-                }),
-              ],
-              onChanged: onCreditCardChanged,
-            ),
-            const SizedBox(height: 16),
+          ],
+
+          if (isExpense) ...[
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              value: isInstallment,
-              onChanged: onInstallmentChanged,
               title: const Text('Compra parcelada'),
               subtitle: const Text(
-                'Serão geradas despesas mensais automaticamente',
+                'Se ativo, gera despesas mensais automaticamente',
+              ),
+              value: widget.isInstallment,
+              onChanged: widget.onInstallmentChanged,
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          if (isExpense && widget.isInstallment) ...[
+            DropdownButtonFormField<String>(
+              value: widget.selectedCreditCardId,
+              decoration: const InputDecoration(
+                labelText: 'Cartão de crédito',
+              ),
+              items: widget.creditCards.map((card) {
+                return DropdownMenuItem<String>(
+                  value: card.id as String,
+                  child: Text(card.name as String),
+                );
+              }).toList(),
+              onChanged: widget.onCreditCardChanged,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: widget.installmentCountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Quantidade de parcelas',
               ),
             ),
-            if (isInstallment) ...[
-              const SizedBox(height: 8),
-              TextField(
-                controller: installmentCountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Quantidade de parcelas',
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.08),
                 ),
               ),
-              const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Prévia do parcelamento',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 10),
-                      _PreviewInfoRow(
-                        label: 'Primeira parcela',
-                        value: _formatDate(mainDate),
-                      ),
-                      const SizedBox(height: 8),
-                      _PreviewInfoRow(
-                        label: 'Última parcela',
-                        value: parsedInstallments != null &&
-                                parsedInstallments > 0
-                            ? _formatDate(_addMonths(
-                                mainDate,
-                                parsedInstallments - 1,
-                              ))
-                            : '-',
-                      ),
-                      const SizedBox(height: 8),
-                      _PreviewInfoRow(
-                        label: 'Valor da parcela',
-                        value: previewInstallmentValue != null
-                            ? 'R\$ ${previewInstallmentValue.toStringAsFixed(2).replaceAll('.', ',')}'
-                            : '-',
-                      ),
-                    ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Prévia do parcelamento',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Primeira parcela',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(widget.mainDate),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Última parcela',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(_lastInstallmentDate),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Valor da parcela',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _installmentAmountPreview != null
+                        ? _formatCurrency(_installmentAmountPreview!)
+                        : '--',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            const SizedBox(height: 20),
           ],
-          const SizedBox(height: 16),
+
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
               isExpense
-                  ? (isInstallment
-                      ? 'Data da primeira parcela: ${_formatDate(mainDate)}'
-                      : 'Data de vencimento: ${_formatDate(mainDate)}')
-                  : 'Data de recebimento: ${_formatDate(mainDate)}',
+                  ? widget.isInstallment
+                      ? 'Data da primeira parcela'
+                      : 'Data de vencimento'
+                  : 'Data de recebimento',
             ),
+            subtitle: Text(_formatDate(widget.mainDate)),
             trailing: OutlinedButton(
-              onPressed: onPickMainDate,
+              onPressed: widget.onPickMainDate,
               child: const Text('Escolher data'),
             ),
           ),
-          if (isExpense && !isInstallment) ...[
-            const SizedBox(height: 8),
+          const SizedBox(height: 16),
+
+          if (isExpense && !widget.isInstallment) ...[
             DropdownButtonFormField<String>(
-              value: selectedStatus,
+              value: widget.selectedStatus,
               decoration: const InputDecoration(
                 labelText: 'Status',
               ),
@@ -272,112 +366,67 @@ class TransactionFormCard extends StatelessWidget {
                   value: 'paid',
                   child: Text('Pago'),
                 ),
-                DropdownMenuItem(
-                  value: 'overdue',
-                  child: Text('Atrasado'),
-                ),
               ],
-              onChanged: onStatusChanged,
+              onChanged: widget.onStatusChanged,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              value: markAsPaid,
-              onChanged: onMarkAsPaidChanged,
               title: const Text('Marcar como pago'),
-              subtitle: const Text(
-                'Você pode ajustar a data real manualmente',
-              ),
+              value: widget.markAsPaid,
+              onChanged: widget.onMarkAsPaidChanged,
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                paidAtDate != null
-                    ? 'Data de pagamento: ${_formatDate(paidAtDate!)}'
-                    : 'Data de pagamento: não informada',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed:
-                        selectedStatus == 'paid' ? onPickPaidAtDate : null,
-                    child: const Text('Escolher data'),
-                  ),
-                  if (paidAtDate != null)
-                    TextButton(
-                      onPressed: onClearPaidAt,
-                      child: const Text('Limpar'),
+            const SizedBox(height: 8),
+            if (widget.markAsPaid) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Data do pagamento'),
+                subtitle: Text(
+                  widget.paidAtDate != null
+                      ? _formatDate(widget.paidAtDate!)
+                      : 'Não informada',
+                ),
+                trailing: Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: widget.onPickPaidAtDate,
+                      child: const Text('Escolher data'),
                     ),
-                ],
+                    if (widget.paidAtDate != null)
+                      OutlinedButton(
+                        onPressed: widget.onClearPaidAt,
+                        child: const Text('Limpar'),
+                      ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 8),
+            ],
+          ],
+
+          if (!isExpense) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Receitas são registradas como recebidas na data informada.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                  ),
             ),
           ],
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: isSaving ? null : onSave,
-              child: isSaving
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      isInstallment ? 'Gerar parcelas' : 'Salvar transação',
-                    ),
+            child: FilledButton(
+              onPressed: widget.isSaving ? null : widget.onSave,
+              child: Text(
+                widget.isSaving ? 'Salvando...' : 'Salvar transação',
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  DateTime _addMonths(DateTime date, int monthsToAdd) {
-    int year = date.year;
-    int month = date.month + monthsToAdd;
-
-    while (month > 12) {
-      month -= 12;
-      year++;
-    }
-
-    final lastDay = DateTime(year, month + 1, 0).day;
-    final safeDay = date.day > lastDay ? lastDay : date.day;
-
-    return DateTime(year, month, safeDay);
-  }
-
-  String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    return '$day/$month/$year';
-  }
-}
-
-class _PreviewInfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _PreviewInfoRow({
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        Text(
-          value,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ],
     );
   }
 }
